@@ -20,8 +20,56 @@ export const dashboardService = {
    */
   async getKPIs(): Promise<DashboardKPIs> {
     try {
-      const data = await apiClient.get<DashboardKPIs>('/dashboard/kpis');
-      return data;
+      // Backend devuelve: { totales, depositosPorEstado, alertas, topClientes, topProductos, movimientosRecientes, tendencia }
+      const backendData = await apiClient.get<{
+        totales: { totalDepositos: number; cantidadTotal: number; valorTotal: number; valorPromedio: number };
+        depositosPorEstado: Array<{ estado: string; count: number; valorTotal: number }>;
+        alertas: { activas: number; criticas: number; proximosVencer: number; vencidos: number };
+        topClientes: Array<{ cliente: { _id: string; nombre: string; cif?: string }; totalDepositos: number; valorTotal: number }>;
+        topProductos: Array<{ producto: { _id: string; codigo: string; nombre: string }; totalDepositos: number; cantidadTotal: number; valorTotal: number }>;
+        movimientosRecientes: any[];
+        tendencia: Array<{ fecha: string; count: number; valorTotal: number }>;
+      }>('/dashboard/kpis');
+
+      // Transformar a DashboardKPIsExtended
+      const kpis: DashboardKPIs = {
+        valorTotalDepositado: backendData.totales.valorTotal || 0,
+        emplazamientosActivos: 0, // TODO: El backend no devuelve esto, necesitamos agregarlo
+        depositosActivos: backendData.totales.totalDepositos || 0,
+        alertasPendientes: backendData.alertas.activas || 0,
+
+        proximosVencer: {
+          cantidad: backendData.alertas.proximosVencer || 0,
+          valorTotal: 0 // TODO: El backend no devuelve el valor total
+        },
+
+        vencidos: {
+          cantidad: backendData.alertas.vencidos || 0,
+          valorTotal: 0 // TODO: El backend no devuelve el valor total
+        },
+
+        topCliente: backendData.topClientes.length > 0
+          ? {
+              nombre: backendData.topClientes[0].cliente.nombre,
+              valorTotal: backendData.topClientes[0].valorTotal
+            }
+          : {
+              nombre: 'N/A',
+              valorTotal: 0
+            },
+
+        topProducto: backendData.topProductos.length > 0
+          ? {
+              nombre: backendData.topProductos[0].producto.nombre,
+              cantidadTotal: backendData.topProductos[0].cantidadTotal
+            }
+          : {
+              nombre: 'N/A',
+              cantidadTotal: 0
+            }
+      };
+
+      return kpis;
     } catch (error: any) {
       console.error('Error al obtener KPIs:', error);
       throw new Error(error.response?.data?.message || 'Error al cargar KPIs del dashboard');
