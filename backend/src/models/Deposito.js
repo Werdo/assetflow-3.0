@@ -217,6 +217,14 @@ depositoSchema.statics.getVencidos = function() {
 
 // Método para datos públicos
 depositoSchema.methods.toPublicJSON = function() {
+  // Calcular días hasta vencimiento
+  let diasHastaVencimiento = null;
+  if (this.fechaVencimiento) {
+    const hoy = new Date();
+    const fechaVenc = new Date(this.fechaVencimiento);
+    diasHastaVencimiento = Math.ceil((fechaVenc - hoy) / (1000 * 60 * 60 * 24));
+  }
+
   return {
     _id: this._id,
     numeroDeposito: this.numeroDeposito,
@@ -225,6 +233,7 @@ depositoSchema.methods.toPublicJSON = function() {
     cantidad: this.cantidad,
     fechaDeposito: this.fechaDeposito,
     fechaVencimiento: this.fechaVencimiento,
+    diasHastaVencimiento: diasHastaVencimiento,
     valorUnitario: this.valorUnitario,
     valorTotal: this.valorTotal,
     estado: this.estado,

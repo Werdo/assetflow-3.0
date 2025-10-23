@@ -14,7 +14,7 @@ exports.getAlertas = asyncHandler(async (req, res) => {
     tipo,
     prioridad,
     resuelta,
-    depositoAfectado,
+    deposito,
     desde,
     hasta,
     page = 1,
@@ -38,8 +38,8 @@ exports.getAlertas = asyncHandler(async (req, res) => {
     query.resuelta = resuelta === 'true';
   }
 
-  if (depositoAfectado) {
-    query.depositoAfectado = depositoAfectado;
+  if (deposito) {
+    query.deposito = deposito;
   }
 
   if (desde || hasta) {
@@ -54,7 +54,7 @@ exports.getAlertas = asyncHandler(async (req, res) => {
   const [alertas, total] = await Promise.all([
     Alerta.find(query)
       .populate({
-        path: 'depositoAfectado',
+        path: 'deposito',
         select: 'numeroDeposito producto emplazamiento cantidad valorTotal',
         populate: [
           { path: 'producto', select: 'codigo nombre' },
@@ -93,7 +93,7 @@ exports.getAlertas = asyncHandler(async (req, res) => {
 exports.getAlerta = asyncHandler(async (req, res) => {
   const alerta = await Alerta.findById(req.params.id)
     .populate({
-      path: 'depositoAfectado',
+      path: 'deposito',
       select: 'numeroDeposito producto emplazamiento cantidad valorTotal fechaVencimiento estado',
       populate: [
         { path: 'producto', select: 'codigo nombre categoria' },
@@ -123,12 +123,12 @@ exports.getAlerta = asyncHandler(async (req, res) => {
  * @access  Private (Admin/Manager)
  */
 exports.createAlerta = asyncHandler(async (req, res) => {
-  const { tipo, prioridad, mensaje, depositoAfectado, observaciones } = req.body;
+  const { tipo, prioridad, mensaje, deposito, observaciones } = req.body;
 
   // Si hay depósito afectado, verificar que existe
-  if (depositoAfectado) {
-    const deposito = await Deposito.findById(depositoAfectado);
-    if (!deposito) {
+  if (deposito) {
+    const depositoDoc = await Deposito.findById(deposito);
+    if (!depositoDoc) {
       throw new ValidationError('Depósito no encontrado');
     }
   }
@@ -137,12 +137,12 @@ exports.createAlerta = asyncHandler(async (req, res) => {
     tipo,
     prioridad,
     mensaje,
-    depositoAfectado,
+    deposito,
     observaciones
   });
 
   await alerta.populate({
-    path: 'depositoAfectado',
+    path: 'deposito',
     select: 'numeroDeposito producto emplazamiento',
     populate: [
       { path: 'producto', select: 'codigo nombre' },
@@ -249,7 +249,7 @@ exports.getAlertasActivas = asyncHandler(async (req, res) => {
   const [alertas, total] = await Promise.all([
     Alerta.find(query)
       .populate({
-        path: 'depositoAfectado',
+        path: 'deposito',
         select: 'numeroDeposito producto emplazamiento',
         populate: [
           { path: 'producto', select: 'codigo nombre' },
@@ -293,7 +293,7 @@ exports.getAlertasCriticas = asyncHandler(async (req, res) => {
   const [alertas, total] = await Promise.all([
     Alerta.find({ prioridad: 'alta', resuelta: false })
       .populate({
-        path: 'depositoAfectado',
+        path: 'deposito',
         select: 'numeroDeposito producto emplazamiento cantidad valorTotal estado',
         populate: [
           { path: 'producto', select: 'codigo nombre' },
@@ -342,7 +342,7 @@ exports.getAlertasPorPrioridad = asyncHandler(async (req, res) => {
   const [alertas, total] = await Promise.all([
     Alerta.find({ prioridad, resuelta: false })
       .populate({
-        path: 'depositoAfectado',
+        path: 'deposito',
         select: 'numeroDeposito producto emplazamiento',
         populate: [
           { path: 'producto', select: 'codigo nombre' },
@@ -417,12 +417,12 @@ exports.getEstadisticas = asyncHandler(async (req, res) => {
     {
       $match: {
         resuelta: false,
-        depositoAfectado: { $exists: true, $ne: null }
+        deposito: { $exists: true, $ne: null }
       }
     },
     {
       $group: {
-        _id: '$depositoAfectado',
+        _id: '$deposito',
         count: { $sum: 1 },
         prioridadAlta: {
           $sum: { $cond: [{ $eq: ['$prioridad', 'alta'] }, 1, 0] }
@@ -485,7 +485,7 @@ exports.generarAlertasAutomaticas = asyncHandler(async (req, res) => {
       const diasHastaVencimiento = deposito.getDiasHastaVencimiento();
       if (diasHastaVencimiento <= 30 && diasHastaVencimiento >= 0) {
         const alertaExistente = await Alerta.findOne({
-          depositoAfectado: deposito._id,
+          deposito: deposito._id,
           tipo: 'vencimiento_proximo',
           resuelta: false
         });
@@ -497,7 +497,7 @@ exports.generarAlertasAutomaticas = asyncHandler(async (req, res) => {
         }
       } else if (diasHastaVencimiento < 0) {
         const alertaExistente = await Alerta.findOne({
-          depositoAfectado: deposito._id,
+          deposito: deposito._id,
           tipo: 'producto_vencido',
           resuelta: false
         });
@@ -507,7 +507,7 @@ exports.generarAlertasAutomaticas = asyncHandler(async (req, res) => {
             tipo: 'producto_vencido',
             prioridad: 'alta',
             mensaje: `Depósito ${deposito.numeroDeposito} VENCIDO hace ${Math.abs(diasHastaVencimiento)} días`,
-            depositoAfectado: deposito._id
+            deposito: deposito._id
           });
           alertasCreadas++;
           resumen.vencimiento++;
@@ -518,7 +518,7 @@ exports.generarAlertasAutomaticas = asyncHandler(async (req, res) => {
     // Alerta de valor alto (> 10,000€)
     if (deposito.valorTotal > 10000) {
       const alertaExistente = await Alerta.findOne({
-        depositoAfectado: deposito._id,
+        deposito: deposito._id,
         tipo: 'valor_alto',
         resuelta: false
       });

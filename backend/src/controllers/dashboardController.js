@@ -297,7 +297,7 @@ exports.getMapaEmplazamientos = asyncHandler(async (req, res) => {
       // Obtener alertas del emplazamiento
       const depositosIds = depositos.map(d => d._id);
       const alertasCount = await Alerta.countDocuments({
-        depositoAfectado: { $in: depositosIds },
+        deposito: { $in: depositosIds },
         resuelta: false
       });
 
@@ -353,9 +353,9 @@ exports.getAlertasCriticas = asyncHandler(async (req, res) => {
   })
     .sort({ createdAt: -1 })
     .limit(10)
-    .populate('depositoAfectado', 'numeroDeposito producto cliente emplazamiento cantidad valorTotal')
+    .populate('deposito', 'numeroDeposito producto cliente emplazamiento cantidad valorTotal')
     .populate({
-      path: 'depositoAfectado',
+      path: 'deposito',
       populate: [
         { path: 'producto', select: 'codigo nombre' },
         { path: 'cliente', select: 'nombre' },
@@ -444,7 +444,7 @@ exports.getEstadisticasPorCliente = asyncHandler(async (req, res) => {
     Alerta.find({
       resuelta: false
     }).populate({
-      path: 'depositoAfectado',
+      path: 'deposito',
       match: { cliente: clienteId },
       select: 'numeroDeposito'
     }),
@@ -457,7 +457,7 @@ exports.getEstadisticasPorCliente = asyncHandler(async (req, res) => {
   ]);
 
   // Filtrar alertas que tienen depósito del cliente
-  const alertasCliente = alertas.filter(a => a.depositoAfectado !== null);
+  const alertasCliente = alertas.filter(a => a.deposito !== null);
 
   // Calcular totales
   const totales = depositos.reduce((acc, dep) => {
@@ -544,9 +544,9 @@ exports.getEstadisticasPorEmplazamiento = asyncHandler(async (req, res) => {
   // Obtener alertas relacionadas
   const depositosIds = depositos.map(d => d._id);
   const alertas = await Alerta.find({
-    depositoAfectado: { $in: depositosIds },
+    deposito: { $in: depositosIds },
     resuelta: false
-  }).populate('depositoAfectado', 'numeroDeposito producto');
+  }).populate('deposito', 'numeroDeposito producto');
 
   // Obtener movimientos
   const movimientos = await Movimiento.find({

@@ -142,7 +142,7 @@ exports.getDeposito = asyncHandler(async (req, res) => {
 
   // Obtener alertas relacionadas
   const alertas = await Alerta.find({
-    depositoAfectado: deposito._id,
+    deposito: deposito._id,
     resuelta: false
   }).sort({ createdAt: -1 });
 
@@ -525,7 +525,7 @@ exports.extenderPlazo = asyncHandler(async (req, res) => {
   if (diasHastaVencimiento > 30) {
     await Alerta.updateMany(
       {
-        depositoAfectado: deposito._id,
+        deposito: deposito._id,
         tipo: 'vencimiento_proximo',
         resuelta: false
       },
@@ -688,7 +688,7 @@ exports.marcarRetirado = asyncHandler(async (req, res) => {
   // Resolver alertas relacionadas
   await Alerta.updateMany(
     {
-      depositoAfectado: deposito._id,
+      deposito: deposito._id,
       resuelta: false
     },
     {

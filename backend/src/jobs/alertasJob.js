@@ -45,7 +45,7 @@ async function generarAlertas() {
         // Depósitos vencidos
         if (diasHastaVencimiento < 0) {
           const alertaExistente = await Alerta.findOne({
-            depositoAfectado: deposito._id,
+            deposito: deposito._id,
             tipo: 'producto_vencido',
             resuelta: false
           });
@@ -55,7 +55,7 @@ async function generarAlertas() {
               tipo: 'producto_vencido',
               prioridad: 'alta',
               mensaje: `Depósito ${deposito.numeroDeposito} VENCIDO hace ${Math.abs(diasHastaVencimiento)} días`,
-              depositoAfectado: deposito._id,
+              deposito: deposito._id,
               observaciones: `Generado automáticamente por job de alertas`
             });
             alertasCreadas.vencidos++;
@@ -65,7 +65,7 @@ async function generarAlertas() {
         // Depósitos próximos a vencer (30 días)
         else if (diasHastaVencimiento >= 0 && diasHastaVencimiento <= 30) {
           const alertaExistente = await Alerta.findOne({
-            depositoAfectado: deposito._id,
+            deposito: deposito._id,
             tipo: 'vencimiento_proximo',
             resuelta: false
           });
@@ -81,7 +81,7 @@ async function generarAlertas() {
       // 2. Alertas de valor alto (> 10,000€)
       if (deposito.valorTotal > 10000) {
         const alertaExistente = await Alerta.findOne({
-          depositoAfectado: deposito._id,
+          deposito: deposito._id,
           tipo: 'valor_alto',
           resuelta: false
         });
@@ -151,7 +151,7 @@ async function limpiarAlertasDuplicadas() {
     if (depositosIds.length > 0) {
       const resultado = await Alerta.updateMany(
         {
-          depositoAfectado: { $in: depositosIds },
+          deposito: { $in: depositosIds },
           resuelta: false
         },
         {
@@ -181,7 +181,7 @@ async function limpiarAlertasDuplicadas() {
       if (diasHastaVencimiento > 30) {
         await Alerta.updateMany(
           {
-            depositoAfectado: deposito._id,
+            deposito: deposito._id,
             tipo: { $in: ['vencimiento_proximo', 'producto_vencido'] },
             resuelta: false
           },

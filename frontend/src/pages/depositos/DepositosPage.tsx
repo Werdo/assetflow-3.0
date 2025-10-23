@@ -55,7 +55,7 @@ const DepositosPage = () => {
     cantidad: 0,
     valorUnitario: 0,
     fechaDeposito: new Date().toISOString().split('T')[0],
-    fechaVencimiento: '',
+    fechaVencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 días por defecto
     observaciones: ''
   });
 
@@ -182,7 +182,7 @@ const DepositosPage = () => {
       cantidad: 0,
       valorUnitario: 0,
       fechaDeposito: new Date().toISOString().split('T')[0],
-      fechaVencimiento: '',
+      fechaVencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 días por defecto
       observaciones: ''
     });
     setProductosFormulario([{ producto: '', cantidad: 1, valorUnitario: 0 }]);

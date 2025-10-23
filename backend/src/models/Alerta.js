@@ -133,18 +133,22 @@ alertaSchema.statics.crearAlertaStockBajo = async function(producto, stockActual
 
 // Método estático para crear alerta de valor alto
 alertaSchema.statics.crearAlertaValorAlto = async function(deposito, valorUmbral) {
+  // Null safety checks
+  const valorTotal = deposito.valorTotal || 0;
+  const valorUmbralSafe = valorUmbral || 0;
+
   const alerta = await this.create({
     tipo: 'valor_alto',
-    prioridad: deposito.valorTotal > valorUmbral * 2 ? 'alta' : 'media',
+    prioridad: valorTotal > valorUmbralSafe * 2 ? 'alta' : 'media',
     deposito: deposito._id,
     emplazamiento: deposito.emplazamiento,
     producto: deposito.producto,
     titulo: 'Depósito de alto valor',
-    descripcion: `El depósito tiene un valor de €${deposito.valorTotal.toFixed(2)}, superior al umbral de €${valorUmbral.toFixed(2)}`,
+    descripcion: `El depósito tiene un valor de €${valorTotal.toFixed(2)}, superior al umbral de €${valorUmbralSafe.toFixed(2)}`,
     metadatos: {
-      valorTotal: deposito.valorTotal,
-      valorUmbral,
-      cantidad: deposito.cantidad
+      valorTotal: valorTotal,
+      valorUmbral: valorUmbralSafe,
+      cantidad: deposito.cantidad || 0
     }
   });
 
