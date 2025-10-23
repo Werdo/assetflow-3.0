@@ -127,9 +127,10 @@ export const depositoService = {
   /**
    * Elimina un depósito (soft delete, solo admin)
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string): Promise<Deposito> {
     try {
-      await apiClient.delete(`/depositos/${id}`);
+      const response = await apiClient.delete<{ deposito: Deposito }>(`/depositos/${id}`);
+      return response.deposito;
     } catch (error: any) {
       console.error('Error al eliminar depósito:', error);
       throw new Error(error.response?.data?.message || 'Error al eliminar depósito');

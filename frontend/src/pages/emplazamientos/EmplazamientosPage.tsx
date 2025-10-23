@@ -55,7 +55,7 @@ export const EmplazamientosPage = () => {
     telefono: '',
     email: '',
     estado: 'activo',
-    notas: ''
+    observaciones: ''
   });
 
   useEffect(() => {
@@ -97,7 +97,7 @@ export const EmplazamientosPage = () => {
         telefono: emplazamiento.telefono || '',
         email: emplazamiento.email || '',
         estado: emplazamiento.estado,
-        notas: emplazamiento.notas || ''
+        observaciones: emplazamiento.observaciones || ''
       });
     } else {
       setEditingEmplazamiento(null);
@@ -120,7 +120,7 @@ export const EmplazamientosPage = () => {
         telefono: '',
         email: '',
         estado: 'activo',
-        notas: ''
+        observaciones: ''
       });
     }
     setShowModal(true);
@@ -624,12 +624,12 @@ export const EmplazamientosPage = () => {
                 </Row>
 
                 <Form.Group className="mb-3">
-                  <Form.Label>Notas</Form.Label>
+                  <Form.Label>Observaciones</Form.Label>
                   <Form.Control
                     as="textarea"
                     rows={3}
-                    value={formData.notas}
-                    onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
+                    value={formData.observaciones}
+                    onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
                     placeholder="Información adicional..."
                   />
                 </Form.Group>

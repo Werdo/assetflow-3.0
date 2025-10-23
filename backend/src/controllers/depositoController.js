@@ -427,20 +427,31 @@ exports.deleteDeposito = asyncHandler(async (req, res) => {
 
   // Soft delete
   deposito.activo = false;
+  deposito.estado = 'retirado';
   await deposito.save();
 
-  // Populate to get cliente through emplazamiento
-  await deposito.populate({
-    path: 'emplazamiento',
-    select: 'cliente'
-  });
+  // Populate to get cliente through emplazamiento and producto
+  await deposito.populate([
+    {
+      path: 'producto',
+      select: 'codigo nombre'
+    },
+    {
+      path: 'emplazamiento',
+      select: 'codigo nombre cliente',
+      populate: {
+        path: 'cliente',
+        select: 'nombre'
+      }
+    }
+  ]);
 
   // Registrar movimiento
   await Movimiento.create({
     tipo: 'baja',
     deposito: deposito._id,
-    producto: deposito.producto,
-    cliente: deposito.emplazamiento.cliente,
+    producto: deposito.producto._id,
+    cliente: deposito.emplazamiento.cliente._id,
     emplazamiento: deposito.emplazamiento._id,
     cantidad: deposito.cantidad,
     observaciones: `Depósito desactivado - ${deposito.numeroDeposito}`,
@@ -455,7 +466,10 @@ exports.deleteDeposito = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: 'Depósito desactivado exitosamente'
+    message: 'Depósito desactivado exitosamente',
+    data: {
+      deposito: deposito.toPublicJSON()
+    }
   });
 });
 

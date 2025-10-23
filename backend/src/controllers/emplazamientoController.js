@@ -86,7 +86,7 @@ exports.getEmplazamiento = asyncHandler(async (req, res) => {
  * @access  Private (Admin/Manager)
  */
 exports.createEmplazamiento = asyncHandler(async (req, res) => {
-  const { cliente, nombre, direccion, coordenadas, contacto, notas } = req.body;
+  const { cliente, nombre, direccion, coordenadas, contacto, observaciones } = req.body;
 
   // Verificar que el cliente existe y está activo
   const clienteDoc = await Cliente.findById(cliente);
@@ -119,7 +119,7 @@ exports.createEmplazamiento = asyncHandler(async (req, res) => {
       coordinates: [lng, lat]
     },
     contacto,
-    notas
+    observaciones
   });
 
   await emplazamiento.populate('cliente', 'nombre cif');
@@ -152,7 +152,13 @@ exports.updateEmplazamiento = asyncHandler(async (req, res) => {
     throw new NotFoundError('Emplazamiento');
   }
 
-  const { cliente, nombre, direccion, coordenadas, contacto, notas, activo } = req.body;
+  const { cliente, nombre, direccion, coordenadas, contacto, observaciones, activo, estado } = req.body;
+
+  // Si se envía estado en lugar de activo, convertirlo
+  let activoValue = activo;
+  if (estado !== undefined) {
+    activoValue = estado === 'activo';
+  }
 
   // Si cambia el cliente, verificar que existe y está activo
   if (cliente && cliente !== emplazamiento.cliente.toString()) {
@@ -184,8 +190,8 @@ exports.updateEmplazamiento = asyncHandler(async (req, res) => {
   }
 
   if (contacto) emplazamiento.contacto = contacto;
-  if (notas !== undefined) emplazamiento.notas = notas;
-  if (activo !== undefined) emplazamiento.activo = activo;
+  if (observaciones !== undefined) emplazamiento.observaciones = observaciones;
+  if (activoValue !== undefined) emplazamiento.activo = activoValue;
 
   await emplazamiento.save();
   await emplazamiento.populate('cliente', 'nombre cif');

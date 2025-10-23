@@ -151,7 +151,7 @@ export interface Emplazamiento {
   // Estado
   estado: 'activo' | 'inactivo';
 
-  notas?: string;
+  observaciones?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -182,7 +182,7 @@ export interface EmplazamientoFormData {
   email?: string;
 
   estado?: 'activo' | 'inactivo';
-  notas?: string;
+  observaciones?: string;
 }
 
 export interface EmplazamientoParaMapa {

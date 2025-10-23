@@ -181,6 +181,7 @@ emplazamientoSchema.methods.toPublicJSON = function() {
     coordenadas: this.coordenadas,
     contacto: this.contacto,
     activo: this.activo,
+    estado: this.activo ? 'activo' : 'inactivo',
     observaciones: this.observaciones,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt
