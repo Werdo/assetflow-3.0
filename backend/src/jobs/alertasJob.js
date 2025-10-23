@@ -71,7 +71,7 @@ async function generarAlertas() {
           });
 
           if (!alertaExistente) {
-            await Alerta.crearAlertaVencimiento(deposito);
+            await Alerta.crearAlertaVencimiento(deposito, diasHastaVencimiento);
             alertasCreadas.vencimiento++;
             alertasCreadas.total++;
           }
