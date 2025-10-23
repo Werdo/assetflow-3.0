@@ -51,6 +51,10 @@ tmp/
 temp/
 *.tmp
 
+# Deployment packages
+*.tar.gz
+*.zip
+
 # Docker
 *.pid
 *.seed

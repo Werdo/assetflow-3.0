@@ -1,0 +1,18 @@
+[Unit]
+Description=AssetFlow 3.0 Monitoring Agent
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=admin
+Group=admin
+WorkingDirectory=/opt/assetflow-monitor
+ExecStart=/bin/bash /opt/assetflow-monitor/monitor-agent.sh
+Restart=always
+RestartSec=300
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
