@@ -353,13 +353,16 @@ exports.getAlertasCriticas = asyncHandler(async (req, res) => {
   })
     .sort({ createdAt: -1 })
     .limit(10)
-    .populate('deposito', 'numeroDeposito producto cliente emplazamiento cantidad valorTotal')
     .populate({
       path: 'deposito',
+      select: 'numeroDeposito producto emplazamiento cantidad valorTotal',
       populate: [
         { path: 'producto', select: 'codigo nombre' },
-        { path: 'cliente', select: 'nombre' },
-        { path: 'emplazamiento', select: 'nombre' }
+        {
+          path: 'emplazamiento',
+          select: 'nombre cliente',
+          populate: { path: 'cliente', select: 'nombre' }
+        }
       ]
     });
 

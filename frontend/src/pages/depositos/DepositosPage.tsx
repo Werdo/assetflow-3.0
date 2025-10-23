@@ -644,7 +644,7 @@ const DepositosPage = () => {
                           >
                             <i className="bi bi-eye"></i>
                           </Button>
-                          {deposito.estado === 'activo' && (
+                          {deposito.estado !== 'retirado' && (
                             <>
                               <Button
                                 variant="outline-secondary"
