@@ -52,7 +52,7 @@ const depositoSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  notas: {
+  observaciones: {
     type: String,
     trim: true
   }
@@ -229,7 +229,7 @@ depositoSchema.methods.toPublicJSON = function() {
     valorTotal: this.valorTotal,
     estado: this.estado,
     activo: this.activo,
-    notas: this.notas,
+    observaciones: this.observaciones,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt
   };

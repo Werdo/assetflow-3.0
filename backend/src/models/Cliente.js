@@ -41,7 +41,7 @@ const clienteSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  notas: {
+  observaciones: {
     type: String,
     trim: true
   }
@@ -129,7 +129,7 @@ clienteSchema.methods.toPublicJSON = function() {
     direccion: this.direccion,
     contacto: this.contacto,
     activo: this.activo,
-    notas: this.notas,
+    observaciones: this.observaciones,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt
   };

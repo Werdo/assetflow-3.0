@@ -240,6 +240,7 @@ export interface Deposito {
 
 export interface DepositoFormData {
   producto: string;
+  cliente: string;
   emplazamiento: string;
   cantidad: number;
   valorUnitario?: number;

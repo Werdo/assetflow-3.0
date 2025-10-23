@@ -58,7 +58,7 @@ const emplazamientoSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  notas: {
+  observaciones: {
     type: String,
     trim: true
   }
@@ -181,7 +181,7 @@ emplazamientoSchema.methods.toPublicJSON = function() {
     coordenadas: this.coordenadas,
     contacto: this.contacto,
     activo: this.activo,
-    notas: this.notas,
+    observaciones: this.observaciones,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt
   };
