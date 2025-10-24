@@ -41,8 +41,9 @@ export const UsersPage: React.FC = () => {
         search: searchTerm || undefined,
         role: roleFilter ? (roleFilter as any) : undefined,
       });
-      // Handle both possible response structures
-      const usersData = (response.data as any).items || (response.data as any).users || [];
+      // response ya es response.data.data del backend (gracias a api.ts)
+      // Backend devuelve: { users: [...], pagination: {...} }
+      const usersData = (response as any).users || [];
       setUsers(usersData);
     } catch (error: any) {
       toast.error(error.message || 'Error al cargar usuarios');
