@@ -1,9 +1,87 @@
-# Changelog - AssetFlow 3.0
+# Changelog - AssetFlow
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
+
+---
+
+## [3.5.0] - 2025-10-24 - Stable Production Release
+
+### Fixed
+- **Alertas Module**: Resuelto fallo crítico por mismatch de campo `depositoAfectado` vs `deposito`
+  - Renombrado en 5 archivos: alertaController, dashboardController, depositoController, alertasJob, Alerta model
+  - 40+ referencias corregidas en alertaController.js
+  - Agregada null safety en `crearAlertaValorAlto` método
+  - Agregado parámetro `diasHastaVencimiento` en `crearAlertaVencimiento`
+
+- **Depósitos - Creación**: Resuelto bloqueo de HTML5 validation con fecha vacía
+  - Default `fechaVencimiento` = +30 días desde hoy
+  - Corregido en 2 ubicaciones en DepositosPage.tsx
+
+- **Depósitos - Días Restantes**: Agregado cálculo en toPublicJSON
+  - Campo `diasHastaVencimiento` ahora incluido en respuesta API
+  - Muestra días correctamente en lugar de "-"
+
+- **Dashboard Alertas**: Corregido error de populate anidado
+  - Cambiado de populate directo `deposito.cliente` a populate anidado correcto
+  - Path correcto: deposito → emplazamiento → cliente
+
+- **Depósitos - Botones Editar/Eliminar**: Corregida visibilidad
+  - Cambiado condición de `estado === 'activo'` a `estado !== 'retirado'`
+  - Permite editar depósitos en estados: activo, proximo_vencimiento, vencido
+
+- **Depósitos - Eliminación**: Corregida inconsistencia de estado
+  - Backend ahora establece explícitamente `estado = 'retirado'`
+  - Respuesta incluye depósito actualizado con populate completo
+  - Frontend actualiza estado local sin reload completo de lista
+
+- **Emplazamientos - Edición**: Resuelto error de página en blanco
+  - Mismatch de campo `notas` vs `observaciones` corregido
+  - Renombrado en modelo, controller, types y UI (5+ ubicaciones)
+  - Label cambiado de "Notas" a "Observaciones"
+
+- **Emplazamientos - Estado Toggle**: Resuelto estado siempre "inactivo"
+  - Agregado mapeo `estado` en toPublicJSON: `activo ? 'activo' : 'inactivo'`
+  - Controller acepta campo `estado` y lo convierte a boolean `activo`
+  - Toggle activo/inactivo ahora funcional
+
+- **Usuarios - Creación**: Corregido error "Cannot read properties of undefined"
+  - Eliminado doble acceso a `.data` en UsersPage.tsx
+  - Acceso correcto: `response.users` en lugar de `response.data.users`
+
+### Changed
+- **Backend Models**: Estandarización de nombres de campos
+  - Todos los modelos usan `observaciones` (no `notas`)
+  - Referencias a depósitos usan `deposito` (no `depositoAfectado`)
+  - Emplazamientos mapean `activo` boolean a `estado` string en API responses
+
+- **API Responses**: Mejoradas respuestas de delete operations
+  - `DELETE /api/depositos/:id` ahora retorna depósito actualizado
+  - Incluye populate completo de relaciones (producto, emplazamiento, cliente)
+
+### Documentation
+- **errores.md**: Documento completo con 7 errores críticos documentados
+  - Secciones 10-15 agregadas con análisis detallado
+  - Lecciones aprendidas sobre schema mismatches
+  - Mejores prácticas implementadas
+  - Recomendaciones futuras para prevención
+
+### Deployment
+- **Production**: Sistema desplegado y verificado en 167.235.58.24
+  - Commit: 5338951 (fixes principales)
+  - Commit: 8dc50ee (documentación)
+  - Commit: 95c8514 (usuarios fix)
+  - Todos los contenedores healthy
+  - 9 funcionalidades críticas verificadas
+
+### Technical Debt Resolved
+- Inconsistencias de nombres de campos entre frontend/backend
+- Falta de null safety en métodos de Alerta
+- Populate paths incorrectos en consultas anidadas
+- Response data missing en operaciones de delete
+- Type mismatches entre Boolean y String para estados
 
 ---
 
