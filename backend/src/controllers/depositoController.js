@@ -259,14 +259,11 @@ exports.createDeposito = asyncHandler(async (req, res) => {
 
   // Crear movimiento de entrada
   await Movimiento.create({
-    tipo: 'entrada',
+    tipo: 'deposito',
     deposito: deposito._id,
-    producto: deposito.producto._id,
-    cliente: deposito.emplazamiento.cliente._id,
-    emplazamiento: deposito.emplazamiento._id,
     cantidad: deposito.cantidad,
     fecha: deposito.fechaDeposito,
-    observaciones: `Depósito inicial - ${deposito.numeroDeposito}`,
+    descripcion: `Depósito inicial - ${deposito.numeroDeposito}`,
     usuario: req.user.id
   });
 
@@ -381,13 +378,10 @@ exports.updateDeposito = asyncHandler(async (req, res) => {
   // Registrar movimiento si hubo cambios
   if (cambios.length > 0) {
     await Movimiento.create({
-      tipo: 'modificacion',
+      tipo: 'ajuste',
       deposito: deposito._id,
-      producto: deposito.producto._id,
-      cliente: deposito.emplazamiento.cliente._id,
-      emplazamiento: deposito.emplazamiento._id,
       cantidad: deposito.cantidad,
-      observaciones: `Modificación: ${cambios.join(', ')}`,
+      descripcion: `Modificación: ${cambios.join(', ')}`,
       usuario: req.user.id
     });
   }
@@ -448,13 +442,10 @@ exports.deleteDeposito = asyncHandler(async (req, res) => {
 
   // Registrar movimiento
   await Movimiento.create({
-    tipo: 'baja',
+    tipo: 'retirada',
     deposito: deposito._id,
-    producto: deposito.producto._id,
-    cliente: deposito.emplazamiento.cliente._id,
-    emplazamiento: deposito.emplazamiento._id,
     cantidad: deposito.cantidad,
-    observaciones: `Depósito desactivado - ${deposito.numeroDeposito}`,
+    descripcion: `Depósito desactivado - ${deposito.numeroDeposito}`,
     usuario: req.user.id
   });
 
@@ -524,13 +515,10 @@ exports.extenderPlazo = asyncHandler(async (req, res) => {
 
   // Registrar movimiento
   await Movimiento.create({
-    tipo: 'modificacion',
+    tipo: 'ajuste',
     deposito: deposito._id,
-    producto: deposito.producto._id,
-    cliente: deposito.emplazamiento.cliente._id,
-    emplazamiento: deposito.emplazamiento._id,
     cantidad: deposito.cantidad,
-    observaciones: `Plazo extendido de ${fechaAnterior || 'indefinido'} a ${nuevaFecha.toISOString().split('T')[0]}. Motivo: ${motivo || 'No especificado'}`,
+    descripcion: `Plazo extendido de ${fechaAnterior || 'indefinido'} a ${nuevaFecha.toISOString().split('T')[0]}. Motivo: ${motivo || 'No especificado'}`,
     usuario: req.user.id
   });
 
@@ -622,14 +610,11 @@ exports.marcarFacturado = asyncHandler(async (req, res) => {
 
   // Registrar movimiento
   await Movimiento.create({
-    tipo: 'facturacion',
+    tipo: 'retirada',
     deposito: deposito._id,
-    producto: deposito.producto._id,
-    cliente: deposito.emplazamiento.cliente._id,
-    emplazamiento: deposito.emplazamiento._id,
     cantidad: deposito.cantidad,
     fecha: fechaFacturacion ? new Date(fechaFacturacion) : new Date(),
-    observaciones: `Facturado con nº ${numeroFactura}. ${observaciones || ''}`,
+    descripcion: `Facturado con nº ${numeroFactura}. ${observaciones || ''}`,
     usuario: req.user.id
   });
 
@@ -688,14 +673,11 @@ exports.marcarRetirado = asyncHandler(async (req, res) => {
 
   // Registrar movimiento
   await Movimiento.create({
-    tipo: 'salida',
+    tipo: 'retirada',
     deposito: deposito._id,
-    producto: deposito.producto._id,
-    cliente: deposito.emplazamiento.cliente._id,
-    emplazamiento: deposito.emplazamiento._id,
     cantidad: deposito.cantidad,
     fecha: fechaRetiro ? new Date(fechaRetiro) : new Date(),
-    observaciones: `Retirado - ${deposito.numeroDeposito}. ${observaciones || ''}`,
+    descripcion: `Retirado - ${deposito.numeroDeposito}. ${observaciones || ''}`,
     usuario: req.user.id
   });
 
