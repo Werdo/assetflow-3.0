@@ -30,6 +30,13 @@ exports.getDepositos = asyncHandler(async (req, res) => {
   const query = {};
 
   // Filtros
+  // Por defecto, solo mostrar depósitos activos (a menos que se especifique lo contrario)
+  if (activo !== undefined) {
+    query.activo = activo === 'true';
+  } else {
+    query.activo = true; // Default: solo mostrar depósitos activos
+  }
+
   // Note: cliente filter is handled through emplazamiento relationship
   if (cliente) {
     // Find emplazamientos that belong to this cliente
@@ -46,10 +53,6 @@ exports.getDepositos = asyncHandler(async (req, res) => {
 
   if (estado) {
     query.estado = estado;
-  }
-
-  if (activo !== undefined) {
-    query.activo = activo === 'true';
   }
 
   if (search) {
