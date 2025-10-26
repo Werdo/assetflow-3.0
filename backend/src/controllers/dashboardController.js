@@ -21,12 +21,12 @@ exports.getKPIs = asyncHandler(async (req, res) => {
 
   if (cliente) {
     filtroDepositos.cliente = cliente;
-    filtroMovimientos.cliente = cliente;
+    // No podemos filtrar movimientos por cliente directamente ya que no tiene ese campo
   }
 
   if (emplazamiento) {
     filtroDepositos.emplazamiento = emplazamiento;
-    filtroMovimientos.emplazamiento = emplazamiento;
+    // No podemos filtrar movimientos por emplazamiento directamente ya que no tiene ese campo
   }
 
   if (desde || hasta) {
@@ -153,9 +153,18 @@ exports.getKPIs = asyncHandler(async (req, res) => {
     Movimiento.find(filtroMovimientos)
       .sort({ fecha: -1 })
       .limit(10)
-      .populate('producto', 'codigo nombre')
-      .populate('cliente', 'nombre')
-      .populate('emplazamiento', 'nombre')
+      .populate({
+        path: 'deposito',
+        select: 'numeroDeposito producto emplazamiento',
+        populate: [
+          { path: 'producto', select: 'codigo nombre' },
+          {
+            path: 'emplazamiento',
+            select: 'nombre cliente',
+            populate: { path: 'cliente', select: 'nombre' }
+          }
+        ]
+      })
       .populate('usuario', 'name'),
 
     // Tendencia de depósitos (últimos 30 días)
@@ -233,12 +242,20 @@ exports.getKPIs = asyncHandler(async (req, res) => {
       tipo: m.tipo,
       cantidad: m.cantidad,
       fecha: m.fecha,
-      producto: m.producto ? {
-        codigo: m.producto.codigo,
-        nombre: m.producto.nombre
+      descripcion: m.descripcion,
+      deposito: m.deposito ? {
+        numeroDeposito: m.deposito.numeroDeposito,
+        producto: m.deposito.producto ? {
+          codigo: m.deposito.producto.codigo,
+          nombre: m.deposito.producto.nombre
+        } : null,
+        emplazamiento: m.deposito.emplazamiento ? {
+          nombre: m.deposito.emplazamiento.nombre,
+          cliente: m.deposito.emplazamiento.cliente ? {
+            nombre: m.deposito.emplazamiento.cliente.nombre
+          } : null
+        } : null
       } : null,
-      cliente: m.cliente ? { nombre: m.cliente.nombre } : null,
-      emplazamiento: m.emplazamiento ? { nombre: m.emplazamiento.nombre } : null,
       usuario: m.usuario ? { name: m.usuario.name } : null
     })),
 
@@ -452,11 +469,17 @@ exports.getEstadisticasPorCliente = asyncHandler(async (req, res) => {
       select: 'numeroDeposito'
     }),
 
-    Movimiento.find({ cliente: clienteId })
+    Movimiento.find()
       .sort({ fecha: -1 })
-      .limit(20)
-      .populate('producto', 'codigo nombre')
+      .limit(50)
+      .populate({
+        path: 'deposito',
+        match: { cliente: clienteId },
+        select: 'numeroDeposito producto',
+        populate: { path: 'producto', select: 'codigo nombre' }
+      })
       .populate('usuario', 'name')
+      .then(movs => movs.filter(m => m.deposito !== null))
   ]);
 
   // Filtrar alertas que tienen depósito del cliente
@@ -510,7 +533,11 @@ exports.getEstadisticasPorCliente = asyncHandler(async (req, res) => {
         tipo: m.tipo,
         cantidad: m.cantidad,
         fecha: m.fecha,
-        producto: m.producto,
+        descripcion: m.descripcion,
+        deposito: m.deposito ? {
+          numeroDeposito: m.deposito.numeroDeposito,
+          producto: m.deposito.producto
+        } : null,
         usuario: m.usuario
       }))
     }
@@ -552,13 +579,18 @@ exports.getEstadisticasPorEmplazamiento = asyncHandler(async (req, res) => {
   }).populate('deposito', 'numeroDeposito producto');
 
   // Obtener movimientos
-  const movimientos = await Movimiento.find({
-    emplazamiento: emplazamientoId
-  })
+  const movimientosBrutos = await Movimiento.find()
     .sort({ fecha: -1 })
-    .limit(20)
-    .populate('producto', 'codigo nombre')
+    .limit(50)
+    .populate({
+      path: 'deposito',
+      match: { emplazamiento: emplazamientoId },
+      select: 'numeroDeposito producto',
+      populate: { path: 'producto', select: 'codigo nombre' }
+    })
     .populate('usuario', 'name');
+
+  const movimientos = movimientosBrutos.filter(m => m.deposito !== null);
 
   // Calcular totales por producto
   const totalesPorProducto = depositos.reduce((acc, dep) => {
@@ -600,7 +632,11 @@ exports.getEstadisticasPorEmplazamiento = asyncHandler(async (req, res) => {
         tipo: m.tipo,
         cantidad: m.cantidad,
         fecha: m.fecha,
-        producto: m.producto,
+        descripcion: m.descripcion,
+        deposito: m.deposito ? {
+          numeroDeposito: m.deposito.numeroDeposito,
+          producto: m.deposito.producto
+        } : null,
         usuario: m.usuario
       }))
     }

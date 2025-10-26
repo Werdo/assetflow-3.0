@@ -374,13 +374,11 @@ const DepositosPage = () => {
 
     try {
       setLoading(true);
-      const depositoActualizado = await depositoService.delete(id);
+      await depositoService.delete(id);
 
-      // Actualizar el estado local con el depósito actualizado
+      // Remover el depósito del estado local (filtrar fuera)
       setDepositos(prevDepositos =>
-        prevDepositos.map(dep =>
-          dep._id === depositoActualizado._id ? depositoActualizado : dep
-        )
+        prevDepositos.filter(dep => dep._id !== id)
       );
 
       toast.success('Depósito eliminado exitosamente');
