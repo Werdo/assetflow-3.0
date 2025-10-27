@@ -5,12 +5,23 @@
  */
 
 const mongoose = require('mongoose');
-require('dotenv').config();
+const path = require('path');
+
+// Intentar cargar .env desde el directorio correcto (parent de scripts)
+const envPath = path.resolve(__dirname, '..', '.env');
+require('dotenv').config({ path: envPath });
 
 const cleanDatabase = async () => {
   try {
+    // Verificar que tenemos la URI de MongoDB
+    if (!process.env.MONGO_URI) {
+      console.error('❌ ERROR: MONGO_URI no está definida en las variables de entorno');
+      console.log('💡 Asegúrate de que el archivo .env existe y contiene MONGO_URI');
+      process.exit(1);
+    }
+
     console.log('🚀 Iniciando limpieza de base de datos...');
-    console.log(`📍 Conectando a: ${process.env.MONGO_URI}`);
+    console.log(`📍 Conectando a: ${process.env.MONGO_URI.replace(/mongodb:\/\/([^:]+):([^@]+)@/, 'mongodb://***:***@')}`);
 
     // Conectar a MongoDB
     await mongoose.connect(process.env.MONGO_URI);
