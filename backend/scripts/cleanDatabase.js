@@ -8,23 +8,30 @@ const mongoose = require('mongoose');
 const path = require('path');
 
 // Intentar cargar .env desde el directorio correcto (parent de scripts)
+// Esto funciona en desarrollo, pero en Docker las vars ya están cargadas
 const envPath = path.resolve(__dirname, '..', '.env');
-require('dotenv').config({ path: envPath });
+try {
+  require('dotenv').config({ path: envPath });
+} catch (error) {
+  // Si falla (ej: en Docker), las vars de entorno ya deberían estar disponibles
+  console.log('ℹ️  Usando variables de entorno del sistema (Docker)');
+}
 
 const cleanDatabase = async () => {
   try {
     // Verificar que tenemos la URI de MongoDB
-    if (!process.env.MONGO_URI) {
+    const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
+    if (!MONGO_URI) {
       console.error('❌ ERROR: MONGO_URI no está definida en las variables de entorno');
-      console.log('💡 Asegúrate de que el archivo .env existe y contiene MONGO_URI');
+      console.log('💡 Variables de entorno disponibles:', Object.keys(process.env).filter(k => k.includes('MONGO')));
       process.exit(1);
     }
 
     console.log('🚀 Iniciando limpieza de base de datos...');
-    console.log(`📍 Conectando a: ${process.env.MONGO_URI.replace(/mongodb:\/\/([^:]+):([^@]+)@/, 'mongodb://***:***@')}`);
+    console.log(`📍 Conectando a: ${MONGO_URI.replace(/mongodb:\/\/([^:]+):([^@]+)@/, 'mongodb://***:***@')}`);
 
     // Conectar a MongoDB
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(MONGO_URI);
     console.log('✅ Conectado a MongoDB\n');
 
     // Obtener todas las colecciones
