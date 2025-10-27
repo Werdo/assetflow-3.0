@@ -1099,6 +1099,607 @@ describe('API Response Types', () => {
 
 ---
 
+## 16. INTERVENCIÓN 27 OCTUBRE 2025 - Errores Post-Deployment v3.5.0
+
+### Contexto
+Después del release v3.5.0 (24 Oct 2025), se detectaron 3 errores críticos en producción que impedían el funcionamiento normal del sistema.
+
+### Usuario Reporta
+- Dashboard no funciona (error 500)
+- Depósitos eliminados siguen apareciendo después de refrescar la página
+- Error al editar emplazamientos: "Cannot read properties of undefined (reading 'toFixed')"
+
+---
+
+## 17. ERROR: Dashboard KPIs Roto (500 Error)
+
+### Síntomas
+```
+GET /api/dashboard/kpis 500 (Internal Server Error)
+Cannot populate path 'producto' because it is not in your schema
+```
+
+### Causa Raíz
+**Archivo:** `backend/src/controllers/dashboardController.js`
+
+El controller intentaba hacer `populate('producto')` directamente sobre el modelo Movimiento:
+
+```javascript
+// CÓDIGO ERRÓNEO (líneas 153-159)
+Movimiento.find(filtroMovimientos)
+  .sort({ fecha: -1 })
+  .limit(10)
+  .populate('producto', 'codigo nombre')      // ❌ Campo no existe
+  .populate('cliente', 'nombre')              // ❌ Campo no existe
+  .populate('emplazamiento', 'nombre')        // ❌ Campo no existe
+  .populate('usuario', 'name'),
+```
+
+**Problema:** El modelo Movimiento NO tiene campos `producto`, `cliente` ni `emplazamiento`. Solo tiene:
+- `deposito` (referencia a Deposito)
+- `tipo` (enum)
+- `cantidad` (Number)
+- `fecha` (Date)
+- `usuario` (referencia a User)
+- `descripcion` (String)
+
+Estos datos deben obtenerse a través de la relación `deposito`.
+
+### Impacto
+- ❌ Dashboard completamente no funcional
+- ❌ KPIs no cargan
+- ❌ Movimientos recientes no se muestran
+- ❌ Afecta 3 endpoints:
+  - `GET /api/dashboard/kpis`
+  - `GET /api/dashboard/por-cliente/:clienteId`
+  - `GET /api/dashboard/por-emplazamiento/:emplazamientoId`
+
+### Solución Implementada
+**Commit:** `936055f`
+**Archivos Modificados:** `backend/src/controllers/dashboardController.js`
+
+#### Fix 1: getKPIs - Populate Anidado (líneas 153-168)
+```javascript
+// CORRECTO
+Movimiento.find(filtroMovimientos)
+  .sort({ fecha: -1 })
+  .limit(10)
+  .populate({
+    path: 'deposito',
+    select: 'numeroDeposito producto emplazamiento',
+    populate: [
+      { path: 'producto', select: 'codigo nombre' },
+      {
+        path: 'emplazamiento',
+        select: 'nombre cliente',
+        populate: { path: 'cliente', select: 'nombre' }
+      }
+    ]
+  })
+  .populate('usuario', 'name'),
+```
+
+#### Fix 2: Actualizar Response Mapping (líneas 240-260)
+```javascript
+// ANTES
+movimientosRecientes: movimientosRecientes.map(m => ({
+  _id: m._id,
+  tipo: m.tipo,
+  cantidad: m.cantidad,
+  fecha: m.fecha,
+  producto: m.producto ? { ... } : null,        // ❌ No existe
+  cliente: m.cliente ? { ... } : null,          // ❌ No existe
+  emplazamiento: m.emplazamiento ? { ... } : null, // ❌ No existe
+  usuario: m.usuario ? { ... } : null
+})),
+
+// DESPUÉS
+movimientosRecientes: movimientosRecientes.map(m => ({
+  _id: m._id,
+  tipo: m.tipo,
+  cantidad: m.cantidad,
+  fecha: m.fecha,
+  descripcion: m.descripcion,
+  deposito: m.deposito ? {
+    numeroDeposito: m.deposito.numeroDeposito,
+    producto: m.deposito.producto ? {
+      codigo: m.deposito.producto.codigo,
+      nombre: m.deposito.producto.nombre
+    } : null,
+    emplazamiento: m.deposito.emplazamiento ? {
+      nombre: m.deposito.emplazamiento.nombre,
+      cliente: m.deposito.emplazamiento.cliente ? {
+        nombre: m.deposito.emplazamiento.cliente.nombre
+      } : null
+    } : null
+  } : null,
+  usuario: m.usuario ? { name: m.usuario.name } : null
+})),
+```
+
+#### Fix 3: getEstadisticasPorCliente (líneas 472-482)
+```javascript
+// ANTES: Filtro directo que no funcionaba
+Movimiento.find({ cliente: clienteId })
+
+// DESPUÉS: Filtro con populate match
+Movimiento.find()
+  .sort({ fecha: -1 })
+  .limit(50)
+  .populate({
+    path: 'deposito',
+    match: { cliente: clienteId },
+    select: 'numeroDeposito producto',
+    populate: { path: 'producto', select: 'codigo nombre' }
+  })
+  .populate('usuario', 'name')
+  .then(movs => movs.filter(m => m.deposito !== null))
+```
+
+#### Fix 4: getEstadisticasPorEmplazamiento (líneas 581-593)
+```javascript
+// Mismo patrón de fix que getEstadisticasPorCliente
+const movimientosBrutos = await Movimiento.find()
+  .sort({ fecha: -1 })
+  .limit(50)
+  .populate({
+    path: 'deposito',
+    match: { emplazamiento: emplazamientoId },
+    select: 'numeroDeposito producto',
+    populate: { path: 'producto', select: 'codigo nombre' }
+  })
+  .populate('usuario', 'name');
+
+const movimientos = movimientosBrutos.filter(m => m.deposito !== null);
+```
+
+### Resultado
+- ✅ Dashboard carga correctamente
+- ✅ KPIs se muestran sin errores
+- ✅ Movimientos recientes se visualizan con toda la información
+- ✅ 3 endpoints reparados y funcionales
+
+---
+
+## 18. ERROR: Depósitos Eliminados Reaparecen Después de Refresh
+
+### Síntomas
+1. Usuario elimina un depósito → Desaparece de la lista ✅
+2. Usuario refresca la página (F5) → El depósito eliminado vuelve a aparecer ❌
+3. En la base de datos el depósito SÍ está marcado como `activo: false` ✅
+
+### Causa Raíz
+**Archivo:** `backend/src/controllers/depositoController.js`
+
+El método `getDepositos` NO filtraba por `activo: true` por defecto:
+
+```javascript
+// CÓDIGO ERRÓNEO (líneas 51-53)
+if (activo !== undefined) {
+  query.activo = activo === 'true';
+}
+// Si no se pasa el parámetro, NO filtra por activo
+```
+
+**Problema:**
+- El `deleteDeposito` SÍ guardaba correctamente `activo: false` en la BD
+- Pero el `getDepositos` devolvía TODOS los depósitos (activos + inactivos)
+- Solo filtraba si el frontend enviaba explícitamente `?activo=true`
+
+### Análisis del Flujo Completo
+
+#### Paso 1: Frontend Elimina (FUNCIONABA)
+**Archivo:** `frontend/src/pages/depositos/DepositosPage.tsx` (línea 377)
+
+```javascript
+// ANTES: Actualizaba el depósito en lugar de eliminarlo
+const depositoActualizado = await depositoService.delete(id);
+setDepositos(prevDepositos =>
+  prevDepositos.map(dep =>
+    dep._id === depositoActualizado._id ? depositoActualizado : dep
+  )
+);
+
+// DESPUÉS: Lo filtra de la lista
+await depositoService.delete(id);
+setDepositos(prevDepositos =>
+  prevDepositos.filter(dep => dep._id !== id)
+);
+```
+
+#### Paso 2: Backend Marca como Inactivo (FUNCIONABA)
+**Archivo:** `backend/src/controllers/depositoController.js` (líneas 423-425)
+
+```javascript
+// Soft delete
+deposito.activo = false;
+deposito.estado = 'retirado';
+await deposito.save(); // ✅ Se guardaba correctamente
+```
+
+#### Paso 3: Backend Devuelve Todos (PROBLEMA)
+**Archivo:** `backend/src/controllers/depositoController.js` (líneas 34-38)
+
+```javascript
+// ANTES (líneas 51-53)
+if (activo !== undefined) {
+  query.activo = activo === 'true';
+}
+// No filtraba por defecto → devolvía activos + inactivos
+
+// DESPUÉS (líneas 34-38)
+if (activo !== undefined) {
+  query.activo = activo === 'true';
+} else {
+  query.activo = true; // ✅ Default: solo activos
+}
+```
+
+### Solución Implementada
+**Commit:** `b7fcbff`
+
+**Cambio 1: Backend - Default Filter**
+```javascript
+// Por defecto, solo mostrar depósitos activos
+if (activo !== undefined) {
+  query.activo = activo === 'true';
+} else {
+  query.activo = true; // Default: solo mostrar depósitos activos
+}
+```
+
+**Cambio 2: Frontend - Filter Instead of Map**
+```javascript
+// Remover el depósito del estado local (filtrar fuera)
+setDepositos(prevDepositos =>
+  prevDepositos.filter(dep => dep._id !== id)
+);
+```
+
+### Resultado
+- ✅ Depósito se elimina de la lista inmediatamente
+- ✅ Al refrescar, el depósito NO vuelve a aparecer
+- ✅ Base de datos persiste correctamente el `activo: false`
+- ✅ Comportamiento consistente entre eliminación y recarga
+
+---
+
+## 19. ERROR: toFixed() en Editar Emplazamientos
+
+### Síntomas
+```javascript
+TypeError: Cannot read properties of undefined (reading 'toFixed')
+    at oL (index-DoIjCrSG.js:255:176674)
+```
+
+**Reproducción:**
+1. Usuario hace clic en botón "Editar" de un emplazamiento
+2. Se abre el modal de edición
+3. JavaScript crash en el mapa al intentar mostrar el popup
+
+### Causa Raíz
+**Archivo:** `frontend/src/pages/emplazamientos/EmplazamientosPage.tsx`
+
+**Incompatibilidad de Formatos de Coordenadas:**
+
+#### Backend GeoJSON Format
+```javascript
+// backend/src/models/Emplazamiento.js (líneas 28-46)
+coordenadas: {
+  type: {
+    type: String,
+    enum: ['Point'],
+    default: 'Point'
+  },
+  coordinates: {
+    type: [Number], // [longitude, latitude]
+    required: true,
+    validate: { ... }
+  }
+}
+
+// toPublicJSON() devuelve (línea 181):
+{
+  coordenadas: {
+    type: 'Point',
+    coordinates: [lng, lat]  // Array de números
+  }
+}
+```
+
+#### Frontend Expected Format
+```javascript
+// frontend/src/pages/emplazamientos/EmplazamientosPage.tsx
+coordenadas: {
+  lat: number,
+  lng: number
+}
+
+// Usado en el mapa (líneas 657-658):
+Lat: {formData.coordenadas.lat.toFixed(6)}  // ❌ lat es undefined
+Lng: {formData.coordenadas.lng.toFixed(6)}  // ❌ lng es undefined
+```
+
+#### Error en handleShowModal (línea 93)
+```javascript
+// ANTES: Asignación directa sin conversión
+if (emplazamiento) {
+  setFormData({
+    ...
+    coordenadas: emplazamiento.coordenadas,  // ❌ GeoJSON format
+    ...
+  });
+}
+
+// emplazamiento.coordenadas = {
+//   type: 'Point',
+//   coordinates: [-3.7038, 40.4168]
+// }
+
+// formData.coordenadas.lat → undefined
+// formData.coordenadas.lng → undefined
+```
+
+### Solución Implementada
+**Commit:** `cbf633a`
+**Archivo:** `frontend/src/pages/emplazamientos/EmplazamientosPage.tsx`
+
+```javascript
+const handleShowModal = (emplazamiento?: Emplazamiento) => {
+  if (emplazamiento) {
+    setEditingEmplazamiento(emplazamiento);
+
+    // Convertir coordenadas de GeoJSON a formato lat/lng si es necesario
+    let coordenadas = { lat: 40.4168, lng: -3.7038 }; // Default Madrid
+    if (emplazamiento.coordenadas) {
+      if ('coordinates' in emplazamiento.coordenadas &&
+          Array.isArray(emplazamiento.coordenadas.coordinates)) {
+        // Formato GeoJSON: coordinates = [lng, lat]
+        coordenadas = {
+          lng: emplazamiento.coordenadas.coordinates[0],
+          lat: emplazamiento.coordenadas.coordinates[1]
+        };
+      } else if ('lat' in emplazamiento.coordenadas &&
+                 'lng' in emplazamiento.coordenadas) {
+        // Ya está en formato lat/lng
+        coordenadas = {
+          lat: emplazamiento.coordenadas.lat,
+          lng: emplazamiento.coordenadas.lng
+        };
+      }
+    }
+
+    setFormData({
+      ...
+      coordenadas: coordenadas,  // ✅ Formato lat/lng correcto
+      ...
+    });
+  }
+}
+```
+
+### Conversión Bidireccional Verificada
+
+**Frontend → Backend (Ya funcionaba correctamente)**
+```javascript
+// frontend/src/services/emplazamientoService.ts (líneas 80-87)
+async create(emplazamientoData: EmplazamientoFormData) {
+  const dataParaBackend = {
+    ...emplazamientoData,
+    coordenadas: {
+      type: 'Point',
+      coordinates: [
+        emplazamientoData.coordenadas.lng,  // ✅ Conversión correcta
+        emplazamientoData.coordenadas.lat
+      ]
+    }
+  };
+  return await apiClient.post('/emplazamientos', dataParaBackend);
+}
+```
+
+**Backend → Frontend (REPARADO)**
+```javascript
+// Ahora handleShowModal convierte GeoJSON → lat/lng
+// coordinates: [lng, lat] → { lat: lat, lng: lng }
+```
+
+### Resultado
+- ✅ Editar emplazamientos funciona sin errores
+- ✅ El mapa muestra correctamente las coordenadas
+- ✅ Popup del mapa muestra lat/lng con toFixed(6)
+- ✅ Conversión bidireccional completa y funcional
+
+---
+
+## 20. LIMPIEZA COMPLETA DE BASE DE DATOS
+
+### Contexto
+Usuario solicita limpiar todos los datos de prueba para empezar con datos reales de producción.
+
+### Script Creado
+**Archivo:** `backend/scripts/cleanDatabase.js`
+**Commits:** `5b92188`, `1797921`, `242479c`
+
+```javascript
+/**
+ * Script para limpiar completamente la base de datos
+ * ADVERTENCIA: Este script elimina TODOS los datos de prueba
+ * Mantiene solo el usuario administrador principal
+ */
+
+const mongoose = require('mongoose');
+const path = require('path');
+
+const cleanDatabase = async () => {
+  // Conectar a MongoDB usando MONGODB_URI de env
+  const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
+  await mongoose.connect(MONGO_URI);
+
+  // Obtener todas las colecciones
+  const collections = await mongoose.connection.db.collections();
+
+  // Limpiar cada colección
+  for (const collection of collections) {
+    if (collection.collectionName === 'users') {
+      // Preservar solo el admin
+      await collection.deleteMany({
+        email: { $ne: process.env.ADMIN_EMAIL || 'ppelaez@oversunenergy.com' }
+      });
+    } else {
+      // Eliminar todo
+      await collection.deleteMany({});
+    }
+  }
+};
+```
+
+### Ejecución en Producción
+**Fecha:** 27 de Octubre de 2025, 07:36 UTC
+**Servidor:** 167.235.58.24
+
+```bash
+docker exec assetflow-backend node scripts/cleanDatabase.js
+```
+
+### Resultados
+**Documentos Eliminados: 976 en total**
+
+| Colección | Antes | Después |
+|-----------|-------|---------|
+| alertas | 39 | 0 |
+| users | 2 | 1 (admin) |
+| movimientos | 31 | 0 |
+| depositos | 17 | 0 |
+| emplazamientos | 3 | 0 |
+| clientes | 3 | 0 |
+| productos | 4 | 0 |
+| errorlogs | 87 | 0 |
+| performancemetrics | 791 | 0 |
+| ai_configs | 0 | 0 |
+| ai_insights | 0 | 0 |
+| ai_consultas | 0 | 0 |
+
+**Usuario Preservado:**
+- Name: ppelaez
+- Email: ppelaez@oversunenergy.com
+- Role: admin
+
+### Estado del Sistema Post-Limpieza
+- ✅ Todas las colecciones vacías (excepto 1 usuario admin)
+- ✅ Estructura de base de datos intacta
+- ✅ Índices preservados
+- ✅ Contenedores healthy
+- ✅ API respondiendo correctamente
+- ✅ Sistema listo para datos de producción reales
+
+---
+
+## 21. RESUMEN DE CAMBIOS - Sesión 27 Octubre 2025
+
+### Commits Realizados
+
+| Commit | Descripción | Archivos |
+|--------|-------------|----------|
+| `936055f` | Fix: Dashboard KPIs populate errors + deposit deletion visibility | `dashboardController.js`, `DepositosPage.tsx` |
+| `b7fcbff` | Fix: getDepositos now filters activo=true by default | `depositoController.js` |
+| `cbf633a` | Fix: Convert GeoJSON coordinates to lat/lng format when editing | `EmplazamientosPage.tsx` |
+| `5b92188` | Add: Database cleanup script for production reset | `cleanDatabase.js` |
+| `1797921` | Fix: Database cleanup script .env path resolution | `cleanDatabase.js` |
+| `242479c` | Fix: Use Docker env vars directly in cleanup script | `cleanDatabase.js` |
+
+### Archivos Modificados
+
+**Backend (2 archivos):**
+1. `backend/src/controllers/dashboardController.js` (84 líneas)
+   - Fixed getKPIs populate paths
+   - Fixed getEstadisticasPorCliente movimientos filter
+   - Fixed getEstadisticasPorEmplazamiento movimientos filter
+   - Updated all movimientosRecientes response mappings
+
+2. `backend/src/controllers/depositoController.js` (11 líneas)
+   - Added default `activo: true` filter in getDepositos
+
+**Frontend (2 archivos):**
+1. `frontend/src/pages/depositos/DepositosPage.tsx` (8 líneas)
+   - Changed handleDelete to filter instead of map
+
+2. `frontend/src/pages/emplazamientos/EmplazamientosPage.tsx` (21 líneas)
+   - Added GeoJSON to lat/lng conversion in handleShowModal
+
+**Scripts (1 archivo nuevo):**
+1. `backend/scripts/cleanDatabase.js` (107 líneas)
+   - New script for complete database cleanup
+
+### Lecciones Aprendidas
+
+#### 1. Schema Field Access en Mongoose
+**Problema:** Intentar populate campos que no existen en el schema
+**Solución:** Siempre verificar el schema antes de hacer populate
+**Prevención:**
+```javascript
+// Documentar claramente las relaciones en los modelos
+// Modelo Movimiento NO tiene producto/cliente/emplazamiento
+// Acceder vía: movimiento.deposito.producto
+```
+
+#### 2. Default Query Filters
+**Problema:** No filtrar soft-deleted records por defecto
+**Solución:** Agregar `query.activo = true` como default
+**Mejor Práctica:**
+```javascript
+// SIEMPRE filtrar soft-deleted por defecto
+if (activo !== undefined) {
+  query.activo = activo === 'true';
+} else {
+  query.activo = true; // Default behavior
+}
+```
+
+#### 3. Data Format Conversion (Backend ↔ Frontend)
+**Problema:** Backend GeoJSON vs Frontend lat/lng format
+**Solución:** Convertir formatos en ambas direcciones
+**Patrón:**
+```javascript
+// Backend → Frontend: En component load
+if ('coordinates' in data && Array.isArray(data.coordinates)) {
+  return { lat: data.coordinates[1], lng: data.coordinates[0] };
+}
+
+// Frontend → Backend: En service layer
+coordinates: [formData.lng, formData.lat]
+```
+
+#### 4. Docker Container Environment Variables
+**Problema:** .env file no disponible en container
+**Solución:** Usar variables de entorno del sistema Docker
+**Práctica:**
+```javascript
+// Intentar .env primero, fallback a system env
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
+```
+
+### Estado Final del Sistema
+**Fecha:** 27 de Octubre de 2025, 08:00 UTC
+**Versión:** AssetFlow 3.5.0 (con fixes post-release)
+
+**Funcionalidades Verificadas:**
+- ✅ Dashboard carga sin errores
+- ✅ Depósitos eliminados no reaparecen
+- ✅ Editar emplazamientos funciona correctamente
+- ✅ Base de datos limpia para producción
+- ✅ Todos los contenedores healthy
+- ✅ Sistema listo para datos reales
+
+**Métricas:**
+- Errores resueltos: 3 críticos
+- Commits: 6
+- Documentos eliminados: 976
+- Líneas de código modificadas: 124
+- Tiempo de intervención: ~2 horas
+
+---
+
 **Documento generado por:** Claude Code
-**Última actualización:** 2025-10-23 16:30 UTC
-**Estado:** ✅ Todos los errores críticos resueltos, sistema en producción estable
+**Última actualización:** 2025-10-27 08:00 UTC
+**Estado:** ✅ Todos los errores críticos resueltos, base de datos limpia, sistema listo para producción
