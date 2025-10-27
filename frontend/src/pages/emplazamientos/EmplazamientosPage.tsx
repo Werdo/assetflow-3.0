@@ -81,6 +81,25 @@ export const EmplazamientosPage = () => {
   const handleShowModal = (emplazamiento?: Emplazamiento) => {
     if (emplazamiento) {
       setEditingEmplazamiento(emplazamiento);
+
+      // Convertir coordenadas de GeoJSON a formato lat/lng si es necesario
+      let coordenadas = { lat: 40.4168, lng: -3.7038 }; // Default Madrid
+      if (emplazamiento.coordenadas) {
+        if ('coordinates' in emplazamiento.coordenadas && Array.isArray(emplazamiento.coordenadas.coordinates)) {
+          // Formato GeoJSON: coordinates = [lng, lat]
+          coordenadas = {
+            lng: emplazamiento.coordenadas.coordinates[0],
+            lat: emplazamiento.coordenadas.coordinates[1]
+          };
+        } else if ('lat' in emplazamiento.coordenadas && 'lng' in emplazamiento.coordenadas) {
+          // Ya está en formato lat/lng
+          coordenadas = {
+            lat: emplazamiento.coordenadas.lat,
+            lng: emplazamiento.coordenadas.lng
+          };
+        }
+      }
+
       setFormData({
         codigo: emplazamiento.codigo,
         nombre: emplazamiento.nombre,
@@ -90,7 +109,7 @@ export const EmplazamientosPage = () => {
         codigoPostal: emplazamiento.codigoPostal || '',
         provincia: emplazamiento.provincia || '',
         pais: emplazamiento.pais || 'España',
-        coordenadas: emplazamiento.coordenadas,
+        coordenadas: coordenadas,
         capacidadM3: emplazamiento.capacidadM3,
         tipoAlmacen: emplazamiento.tipoAlmacen || 'general',
         responsable: emplazamiento.responsable || '',
