@@ -11,7 +11,10 @@ const {
   marcarRetirado,
   getProximosVencer,
   getVencidos,
-  getEstadisticas
+  getEstadisticas,
+  buscarPorCodigoUnitario,
+  agregarCodigosUnitarios,
+  importarCodigosCSV
 } = require('../controllers/depositoController');
 const { protect, isAdminOrManager, isAdmin } = require('../middleware/auth');
 const { validateDeposito, validateMongoId } = require('../middleware/validate');
@@ -46,6 +49,13 @@ router.get('/vencidos', getVencidos);
  * @access  Private
  */
 router.get('/estadisticas', getEstadisticas);
+
+/**
+ * @route   GET /api/depositos/buscar-codigo/:codigo
+ * @desc    Buscar depósito por código unitario
+ * @access  Private
+ */
+router.get('/buscar-codigo/:codigo', buscarPorCodigoUnitario);
 
 /**
  * @route   GET /api/depositos/:id
@@ -88,6 +98,20 @@ router.put('/:id/facturar', isAdminOrManager, validateMongoId('id'), marcarFactu
  * @access  Private (Admin/Manager)
  */
 router.put('/:id/retirar', isAdminOrManager, validateMongoId('id'), marcarRetirado);
+
+/**
+ * @route   POST /api/depositos/:id/codigos
+ * @desc    Añadir códigos unitarios a un depósito
+ * @access  Private (Admin/Manager)
+ */
+router.post('/:id/codigos', isAdminOrManager, validateMongoId('id'), agregarCodigosUnitarios);
+
+/**
+ * @route   POST /api/depositos/:id/importar-codigos
+ * @desc    Importar códigos unitarios desde CSV
+ * @access  Private (Admin/Manager)
+ */
+router.post('/:id/importar-codigos', isAdminOrManager, validateMongoId('id'), importarCodigosCSV);
 
 /**
  * @route   DELETE /api/depositos/:id

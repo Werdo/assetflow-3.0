@@ -30,6 +30,8 @@ export const ClientesPage = () => {
     email: '',
     contacto: '',
     activo: true,
+    esSubcliente: false,
+    clientePrincipal: '',
   });
 
   useEffect(() => {
@@ -64,6 +66,8 @@ export const ClientesPage = () => {
         email: cliente.email || '',
         contacto: cliente.contacto || '',
         activo: cliente.activo,
+        esSubcliente: cliente.esSubcliente || false,
+        clientePrincipal: typeof cliente.clientePrincipal === 'string' ? cliente.clientePrincipal : cliente.clientePrincipal?._id || '',
       });
     } else {
       setEditingCliente(null);
@@ -80,6 +84,8 @@ export const ClientesPage = () => {
         email: '',
         contacto: '',
         activo: true,
+        esSubcliente: false,
+        clientePrincipal: '',
       });
     }
     setShowModal(true);
@@ -395,6 +401,55 @@ export const ClientesPage = () => {
                 onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
               />
             </Form.Group>
+
+            <hr />
+
+            <Row>
+              <Col md={12}>
+                <Form.Group className="mb-3">
+                  <Form.Check
+                    type="checkbox"
+                    label="Es Subcliente"
+                    checked={formData.esSubcliente}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        esSubcliente: e.target.checked,
+                        clientePrincipal: e.target.checked ? formData.clientePrincipal : ''
+                      });
+                    }}
+                  />
+                  <Form.Text className="text-muted">
+                    Marca esta opción si este cliente es un subcliente de otro cliente principal
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+            </Row>
+
+            {formData.esSubcliente && (
+              <Row>
+                <Col md={12}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Cliente Principal *</Form.Label>
+                    <Form.Select
+                      value={formData.clientePrincipal}
+                      onChange={(e) => setFormData({ ...formData, clientePrincipal: e.target.value })}
+                      required={formData.esSubcliente}
+                    >
+                      <option value="">Selecciona un cliente principal...</option>
+                      {clientes
+                        .filter(c => !c.esSubcliente && c._id !== editingCliente?._id)
+                        .map(c => (
+                          <option key={c._id} value={c._id}>
+                            {c.codigo} - {c.nombre}
+                          </option>
+                        ))
+                      }
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              </Row>
+            )}
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={handleCloseModal}>

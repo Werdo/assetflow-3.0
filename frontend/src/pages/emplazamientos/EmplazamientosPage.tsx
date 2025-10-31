@@ -249,6 +249,27 @@ export const EmplazamientosPage = () => {
     return cliente.nombre;
   };
 
+  const getSubclienteNombre = (subcliente: string | Cliente | undefined): string | null => {
+    if (!subcliente) return null;
+    if (typeof subcliente === 'string') {
+      const found = clientes.find(c => c._id === subcliente);
+      return found ? found.nombre : null;
+    }
+    return subcliente.nombre;
+  };
+
+  const getClientePrincipalFromSubcliente = (subcliente: string | Cliente | undefined): string | null => {
+    if (!subcliente || typeof subcliente === 'string') return null;
+    if (subcliente.clientePrincipal) {
+      if (typeof subcliente.clientePrincipal === 'string') {
+        const found = clientes.find(c => c._id === subcliente.clientePrincipal);
+        return found ? found.nombre : null;
+      }
+      return subcliente.clientePrincipal.nombre;
+    }
+    return null;
+  };
+
   const markerPosition: LatLngExpression = [formData.coordenadas.lat, formData.coordenadas.lng];
 
   return (
@@ -330,12 +351,25 @@ export const EmplazamientosPage = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {emplazamientosFiltrados.map((emplazamiento) => (
-                        <tr key={emplazamiento._id}>
-                          <td><code>{emplazamiento.codigo}</code></td>
-                          <td><strong>{emplazamiento.nombre}</strong></td>
-                          <td>{getClienteNombre(emplazamiento.cliente)}</td>
-                          <td>{emplazamiento.ciudad}</td>
+                      {emplazamientosFiltrados.map((emplazamiento) => {
+                        const clientePrincipal = getClientePrincipalFromSubcliente(emplazamiento.subcliente);
+                        const subclienteNombre = getSubclienteNombre(emplazamiento.subcliente);
+
+                        return (
+                          <tr key={emplazamiento._id}>
+                            <td><code>{emplazamiento.codigo}</code></td>
+                            <td><strong>{emplazamiento.nombre}</strong></td>
+                            <td>
+                              {clientePrincipal && subclienteNombre ? (
+                                <div>
+                                  <div><strong>{clientePrincipal}</strong></div>
+                                  <small className="text-muted">└ {subclienteNombre}</small>
+                                </div>
+                              ) : (
+                                getClienteNombre(emplazamiento.cliente)
+                              )}
+                            </td>
+                            <td>{emplazamiento.ciudad}</td>
                           <td>
                             <Badge bg="secondary">
                               {emplazamiento.tipoAlmacen === 'general' && 'General'}
@@ -377,7 +411,8 @@ export const EmplazamientosPage = () => {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </Table>
                 </div>

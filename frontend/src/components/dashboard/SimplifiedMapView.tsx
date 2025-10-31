@@ -241,7 +241,16 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
                     <td className="align-middle">
                       <strong>{safeEmp.nombre}</strong>
                     </td>
-                    <td className="align-middle">{safeEmp.cliente}</td>
+                    <td className="align-middle">
+                      {(emp as any)?.subcliente ? (
+                        <div>
+                          <div><strong>{(emp as any).subcliente.clientePrincipal?.nombre || safeEmp.cliente}</strong></div>
+                          <small className="text-muted">└ {(emp as any).subcliente.nombre}</small>
+                        </div>
+                      ) : (
+                        safeEmp.cliente
+                      )}
+                    </td>
                     <td className="align-middle">
                       {safeEmp.ciudad}
                       {safeEmp.provincia && `, ${safeEmp.provincia}`}

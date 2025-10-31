@@ -195,7 +195,14 @@ export const MapView: React.FC<MapViewProps> = ({ emplazamientos, loading = fals
                       <hr className="my-2" />
                       <div className="mb-2">
                         <small className="text-muted d-block">Cliente</small>
-                        <strong>{emp.cliente.nombre}</strong>
+                        {(emp as any).subcliente ? (
+                          <div>
+                            <strong>{(emp as any).subcliente.clientePrincipal?.nombre || emp.cliente.nombre}</strong>
+                            <div className="small text-muted">└ {(emp as any).subcliente.nombre}</div>
+                          </div>
+                        ) : (
+                          <strong>{emp.cliente.nombre}</strong>
+                        )}
                       </div>
                       <div className="mb-2">
                         <small className="text-muted d-block">Ubicación</small>

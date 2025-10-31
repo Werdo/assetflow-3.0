@@ -10,12 +10,20 @@ const logger = require('../utils/logger');
  * @access  Private
  */
 exports.getEmplazamientos = asyncHandler(async (req, res) => {
-  const { cliente, activo, search, page = 1, limit = 20 } = req.query;
+  const { cliente, subcliente, activo, search, page = 1, limit = 20 } = req.query;
 
   const query = {};
 
   if (cliente) {
     query.cliente = cliente;
+  }
+
+  if (subcliente !== undefined) {
+    if (subcliente === 'null' || subcliente === '') {
+      query.subcliente = null;
+    } else {
+      query.subcliente = subcliente;
+    }
   }
 
   if (activo !== undefined) {
@@ -25,6 +33,7 @@ exports.getEmplazamientos = asyncHandler(async (req, res) => {
   if (search) {
     query.$or = [
       { nombre: { $regex: search, $options: 'i' } },
+      { codigo: { $regex: search, $options: 'i' } },
       { 'direccion.calle': { $regex: search, $options: 'i' } },
       { 'direccion.ciudad': { $regex: search, $options: 'i' } }
     ];
@@ -34,7 +43,15 @@ exports.getEmplazamientos = asyncHandler(async (req, res) => {
 
   const [emplazamientos, total] = await Promise.all([
     Emplazamiento.find(query)
-      .populate('cliente', 'nombre cif activo')
+      .populate('cliente', 'nombre cif activo codigo')
+      .populate({
+        path: 'subcliente',
+        select: 'nombre codigo clientePrincipal',
+        populate: {
+          path: 'clientePrincipal',
+          select: 'nombre codigo'
+        }
+      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit)),
@@ -62,7 +79,15 @@ exports.getEmplazamientos = asyncHandler(async (req, res) => {
  */
 exports.getEmplazamiento = asyncHandler(async (req, res) => {
   const emplazamiento = await Emplazamiento.findById(req.params.id)
-    .populate('cliente', 'nombre cif direccion contacto');
+    .populate('cliente', 'nombre cif codigo direccion contacto')
+    .populate({
+      path: 'subcliente',
+      select: 'nombre codigo cif clientePrincipal',
+      populate: {
+        path: 'clientePrincipal',
+        select: 'nombre codigo'
+      }
+    });
 
   if (!emplazamiento) {
     throw new NotFoundError('Emplazamiento');
@@ -86,7 +111,7 @@ exports.getEmplazamiento = asyncHandler(async (req, res) => {
  * @access  Private (Admin/Manager)
  */
 exports.createEmplazamiento = asyncHandler(async (req, res) => {
-  const { cliente, nombre, direccion, coordenadas, contacto, observaciones } = req.body;
+  const { cliente, subcliente, nombre, direccion, coordenadas, contacto, observaciones } = req.body;
 
   // Verificar que el cliente existe y está activo
   const clienteDoc = await Cliente.findById(cliente);
@@ -95,6 +120,24 @@ exports.createEmplazamiento = asyncHandler(async (req, res) => {
   }
   if (!clienteDoc.activo) {
     throw new ValidationError('El cliente está inactivo');
+  }
+
+  // Si se especifica subcliente, verificar que existe y pertenece al cliente
+  let subclienteDoc = null;
+  if (subcliente) {
+    subclienteDoc = await Cliente.findById(subcliente);
+    if (!subclienteDoc) {
+      throw new ValidationError('Subcliente no encontrado');
+    }
+    if (!subclienteDoc.esSubcliente) {
+      throw new ValidationError('El ID especificado no corresponde a un subcliente');
+    }
+    if (!subclienteDoc.clientePrincipal || subclienteDoc.clientePrincipal.toString() !== cliente) {
+      throw new ValidationError('El subcliente no pertenece al cliente especificado');
+    }
+    if (!subclienteDoc.activo) {
+      throw new ValidationError('El subcliente está inactivo');
+    }
   }
 
   // Validar coordenadas
@@ -112,6 +155,7 @@ exports.createEmplazamiento = asyncHandler(async (req, res) => {
 
   const emplazamiento = await Emplazamiento.create({
     cliente,
+    subcliente: subcliente || null,
     nombre,
     direccion,
     coordenadas: {
@@ -122,12 +166,16 @@ exports.createEmplazamiento = asyncHandler(async (req, res) => {
     observaciones
   });
 
-  await emplazamiento.populate('cliente', 'nombre cif');
+  await emplazamiento.populate('cliente', 'nombre cif codigo');
+  if (subcliente) {
+    await emplazamiento.populate('subcliente', 'nombre codigo');
+  }
 
   logger.info('Emplazamiento creado', {
     emplazamientoId: emplazamiento._id,
     nombre: emplazamiento.nombre,
     cliente: clienteDoc.nombre,
+    subcliente: subclienteDoc ? subclienteDoc.nombre : null,
     userId: req.user.id
   });
 
@@ -152,7 +200,7 @@ exports.updateEmplazamiento = asyncHandler(async (req, res) => {
     throw new NotFoundError('Emplazamiento');
   }
 
-  const { cliente, nombre, direccion, coordenadas, contacto, observaciones, activo, estado } = req.body;
+  const { cliente, subcliente, nombre, direccion, coordenadas, contacto, observaciones, activo, estado } = req.body;
 
   // Si se envía estado en lugar de activo, convertirlo
   let activoValue = activo;
@@ -170,6 +218,34 @@ exports.updateEmplazamiento = asyncHandler(async (req, res) => {
       throw new ValidationError('El cliente está inactivo');
     }
     emplazamiento.cliente = cliente;
+  }
+
+  // Si cambia el subcliente, verificar
+  if (subcliente !== undefined) {
+    if (subcliente === null || subcliente === '') {
+      // Se está eliminando el subcliente
+      emplazamiento.subcliente = null;
+    } else {
+      // Se está asignando un subcliente
+      const subclienteDoc = await Cliente.findById(subcliente);
+      if (!subclienteDoc) {
+        throw new ValidationError('Subcliente no encontrado');
+      }
+      if (!subclienteDoc.esSubcliente) {
+        throw new ValidationError('El ID especificado no corresponde a un subcliente');
+      }
+
+      // Verificar que pertenece al cliente actual
+      const clienteActual = emplazamiento.cliente.toString();
+      if (!subclienteDoc.clientePrincipal || subclienteDoc.clientePrincipal.toString() !== clienteActual) {
+        throw new ValidationError('El subcliente no pertenece al cliente del emplazamiento');
+      }
+      if (!subclienteDoc.activo) {
+        throw new ValidationError('El subcliente está inactivo');
+      }
+
+      emplazamiento.subcliente = subcliente;
+    }
   }
 
   if (nombre) emplazamiento.nombre = nombre;
@@ -194,7 +270,8 @@ exports.updateEmplazamiento = asyncHandler(async (req, res) => {
   if (activoValue !== undefined) emplazamiento.activo = activoValue;
 
   await emplazamiento.save();
-  await emplazamiento.populate('cliente', 'nombre cif');
+  await emplazamiento.populate('cliente', 'nombre cif codigo');
+  await emplazamiento.populate('subcliente', 'nombre codigo');
 
   logger.info('Emplazamiento actualizado', {
     emplazamientoId: emplazamiento._id,
@@ -286,8 +363,16 @@ exports.getEmplazamientosCercanos = asyncHandler(async (req, res) => {
  */
 exports.getEmplazamientosParaMapa = asyncHandler(async (req, res) => {
   const emplazamientos = await Emplazamiento.find({ activo: true })
-    .populate('cliente', 'nombre')
-    .select('nombre cliente coordenadas direccion');
+    .populate('cliente', 'nombre codigo')
+    .populate({
+      path: 'subcliente',
+      select: 'nombre codigo clientePrincipal',
+      populate: {
+        path: 'clientePrincipal',
+        select: 'nombre codigo'
+      }
+    })
+    .select('nombre cliente subcliente coordenadas direccion');
 
   // Obtener estadísticas para cada emplazamiento
   const emplazamientosConEstadisticas = await Promise.all(
@@ -297,8 +382,11 @@ exports.getEmplazamientosParaMapa = asyncHandler(async (req, res) => {
         _id: emp._id,
         nombre: emp.nombre,
         cliente: emp.cliente,
+        subcliente: emp.subcliente,
         coordenadas: emp.coordenadas,
         direccion: emp.direccion,
+        ciudad: emp.direccion?.ciudad,
+        provincia: emp.direccion?.provincia,
         estadisticas
       };
     })

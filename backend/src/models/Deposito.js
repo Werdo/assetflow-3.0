@@ -19,6 +19,18 @@ const depositoSchema = new mongoose.Schema({
     required: [true, 'El emplazamiento es requerido'],
     index: true
   },
+  cliente: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Cliente',
+    required: [true, 'El cliente es requerido'],
+    index: true
+  },
+  subcliente: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Cliente',
+    default: null,
+    index: true
+  },
   cantidad: {
     type: Number,
     required: [true, 'La cantidad es requerida'],
@@ -55,7 +67,28 @@ const depositoSchema = new mongoose.Schema({
   observaciones: {
     type: String,
     trim: true
-  }
+  },
+  // Trazabilidad
+  tieneTrazabilidad: {
+    type: Boolean,
+    default: false
+  },
+  codigoLote: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    index: true
+  },
+  tipoLote: {
+    type: String,
+    enum: ['innerbox', 'masterbox', ''],
+    default: ''
+  },
+  codigosUnitarios: [{
+    type: String,
+    trim: true,
+    uppercase: true
+  }]
 }, {
   timestamps: true
 });
@@ -67,6 +100,8 @@ depositoSchema.index({ fechaDeposito: 1 });
 depositoSchema.index({ fechaVencimiento: 1 });
 depositoSchema.index({ estado: 1 });
 depositoSchema.index({ activo: 1 });
+depositoSchema.index({ codigoLote: 1 });
+depositoSchema.index({ codigosUnitarios: 1 });
 
 // Middleware: Auto-generate numeroDeposito y calcular valoración automáticamente antes de guardar
 depositoSchema.pre('save', async function(next) {
@@ -215,6 +250,13 @@ depositoSchema.statics.getVencidos = function() {
   }).populate('producto emplazamiento');
 };
 
+// Método estático para buscar por código unitario
+depositoSchema.statics.buscarPorCodigoUnitario = function(codigo) {
+  return this.findOne({
+    codigosUnitarios: codigo.toUpperCase().trim()
+  }).populate('producto emplazamiento cliente subcliente');
+};
+
 // Método para datos públicos
 depositoSchema.methods.toPublicJSON = function() {
   // Calcular días hasta vencimiento
@@ -230,6 +272,8 @@ depositoSchema.methods.toPublicJSON = function() {
     numeroDeposito: this.numeroDeposito,
     producto: this.producto,
     emplazamiento: this.emplazamiento,
+    cliente: this.cliente,
+    subcliente: this.subcliente,
     cantidad: this.cantidad,
     fechaDeposito: this.fechaDeposito,
     fechaVencimiento: this.fechaVencimiento,
@@ -239,6 +283,10 @@ depositoSchema.methods.toPublicJSON = function() {
     estado: this.estado,
     activo: this.activo,
     observaciones: this.observaciones,
+    tieneTrazabilidad: this.tieneTrazabilidad,
+    codigoLote: this.codigoLote,
+    tipoLote: this.tipoLote,
+    codigosUnitarios: this.codigosUnitarios,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt
   };

@@ -280,6 +280,49 @@ export const depositoService = {
       console.error('Error al marcar depósito como devuelto:', error);
       throw new Error(error.response?.data?.message || 'Error al marcar depósito como devuelto');
     }
+  },
+
+  // ============================================
+  // TRAZABILIDAD - CÓDIGOS UNITARIOS
+  // ============================================
+
+  /**
+   * Busca un depósito por código unitario
+   */
+  async buscarPorCodigoUnitario(codigo: string): Promise<Deposito> {
+    try {
+      const data = await apiClient.get<{ deposito: Deposito }>(`/depositos/buscar-codigo/${encodeURIComponent(codigo)}`);
+      return data.deposito;
+    } catch (error: any) {
+      console.error('Error al buscar por código unitario:', error);
+      throw new Error(error.response?.data?.message || 'No se encontró ningún depósito con ese código');
+    }
+  },
+
+  /**
+   * Añade códigos unitarios a un depósito
+   */
+  async agregarCodigosUnitarios(id: string, codigos: string[]): Promise<{ deposito: Deposito; codigosNuevos: number; conflictos: any[] }> {
+    try {
+      const data = await apiClient.post<{ deposito: Deposito; codigosNuevos: number; conflictos: any[] }>(`/depositos/${id}/codigos`, { codigos });
+      return data;
+    } catch (error: any) {
+      console.error('Error al agregar códigos unitarios:', error);
+      throw new Error(error.response?.data?.message || 'Error al agregar códigos unitarios');
+    }
+  },
+
+  /**
+   * Importa códigos unitarios desde CSV
+   */
+  async importarCodigosCSV(id: string, csvContent: string): Promise<{ deposito: Deposito; codigosNuevos: number; conflictos: any[] }> {
+    try {
+      const data = await apiClient.post<{ deposito: Deposito; codigosNuevos: number; conflictos: any[] }>(`/depositos/${id}/importar-codigos`, { csvContent });
+      return data;
+    } catch (error: any) {
+      console.error('Error al importar códigos desde CSV:', error);
+      throw new Error(error.response?.data?.message || 'Error al importar códigos desde CSV');
+    }
   }
 };
 

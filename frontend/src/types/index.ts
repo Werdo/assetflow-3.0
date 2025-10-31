@@ -83,6 +83,8 @@ export interface Cliente {
   email?: string;
   contacto?: string;
   activo: boolean;
+  esSubcliente?: boolean;
+  clientePrincipal?: string | Cliente;
   notas?: string;
   createdAt: string;
   updatedAt: string;
@@ -101,6 +103,8 @@ export interface ClienteFormData {
   email?: string;
   contacto?: string;
   activo?: boolean;
+  esSubcliente?: boolean;
+  clientePrincipal?: string;
   notas?: string;
 }
 
@@ -223,6 +227,8 @@ export interface Deposito {
   numeroDeposito: string;
   producto: string | Producto;
   emplazamiento: string | Emplazamiento;
+  cliente: string | Cliente;
+  subcliente?: string | Cliente;
   cantidad: number;
   valorUnitario: number;
   valorTotal: number;
@@ -232,6 +238,13 @@ export interface Deposito {
   estado: EstadoDeposito;
   observaciones?: string;
   activo: boolean;
+
+  // Trazabilidad
+  tieneTrazabilidad?: boolean;
+  codigoLote?: string;
+  tipoLote?: 'innerbox' | 'masterbox' | '';
+  codigosUnitarios?: string[];
+
   createdBy: string | User;
   updatedBy?: string | User;
   createdAt: string;
@@ -241,12 +254,19 @@ export interface Deposito {
 export interface DepositoFormData {
   producto: string;
   cliente: string;
+  subcliente?: string;
   emplazamiento: string;
   cantidad: number;
   valorUnitario?: number;
   fechaDeposito?: string;
   fechaVencimiento?: string;
   observaciones?: string;
+
+  // Trazabilidad
+  tieneTrazabilidad?: boolean;
+  codigoLote?: string;
+  tipoLote?: 'innerbox' | 'masterbox' | '';
+  codigosUnitarios?: string[];
 }
 
 export interface ExtenderPlazoData {

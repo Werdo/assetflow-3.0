@@ -56,7 +56,12 @@ const DepositosPage = () => {
     valorUnitario: 0,
     fechaDeposito: new Date().toISOString().split('T')[0],
     fechaVencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 días por defecto
-    observaciones: ''
+    observaciones: '',
+    // Trazabilidad
+    tieneTrazabilidad: false,
+    codigoLote: '',
+    tipoLote: '' as 'innerbox' | 'masterbox' | '',
+    codigosUnitarios: [] as string[]
   });
 
   // Estado para productos dinámicos
@@ -97,6 +102,14 @@ const DepositosPage = () => {
     referenciaAlbaran: '',
     observaciones: ''
   });
+
+  // Estados para trazabilidad - CSV
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [importandoCSV, setImportandoCSV] = useState(false);
+  const [resultadoImportacion, setResultadoImportacion] = useState<{
+    codigosNuevos: number;
+    conflictos: any[];
+  } | null>(null);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -183,7 +196,12 @@ const DepositosPage = () => {
       valorUnitario: 0,
       fechaDeposito: new Date().toISOString().split('T')[0],
       fechaVencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 días por defecto
-      observaciones: ''
+      observaciones: '',
+      // Trazabilidad
+      tieneTrazabilidad: false,
+      codigoLote: '',
+      tipoLote: '' as 'innerbox' | 'masterbox' | '',
+      codigosUnitarios: [] as string[]
     });
     setProductosFormulario([{ producto: '', cantidad: 1, valorUnitario: 0 }]);
     setClienteSeleccionado('');
@@ -202,8 +220,16 @@ const DepositosPage = () => {
       valorUnitario: deposito.valorUnitario,
       fechaDeposito: deposito.fechaDeposito.split('T')[0],
       fechaVencimiento: deposito.fechaVencimiento ? deposito.fechaVencimiento.split('T')[0] : '',
-      observaciones: deposito.observaciones || ''
+      observaciones: deposito.observaciones || '',
+      // Trazabilidad
+      tieneTrazabilidad: deposito.tieneTrazabilidad || false,
+      codigoLote: deposito.codigoLote || '',
+      tipoLote: deposito.tipoLote || '',
+      codigosUnitarios: deposito.codigosUnitarios || []
     });
+    // Limpiar estados de importación
+    setCsvFile(null);
+    setResultadoImportacion(null);
     setShowModal(true);
   };
 
@@ -460,6 +486,67 @@ const DepositosPage = () => {
       toast.error(error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Manejar selección de archivo CSV
+  const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setCsvFile(e.target.files[0]);
+      setResultadoImportacion(null);
+    }
+  };
+
+  // Importar códigos desde CSV
+  const handleImportarCSV = async () => {
+    if (!csvFile) {
+      toast.error('Selecciona un archivo CSV');
+      return;
+    }
+
+    if (!selectedDeposito) {
+      toast.error('No hay depósito seleccionado');
+      return;
+    }
+
+    try {
+      setImportandoCSV(true);
+
+      // Leer el contenido del archivo
+      const fileContent = await csvFile.text();
+
+      // Llamar al servicio
+      const resultado = await depositoService.importarCodigosCSV(selectedDeposito._id, fileContent);
+
+      // Actualizar el formData con los códigos nuevos
+      setFormData({
+        ...formData,
+        codigosUnitarios: resultado.deposito.codigosUnitarios || []
+      });
+
+      // Mostrar resultado
+      setResultadoImportacion({
+        codigosNuevos: resultado.codigosNuevos,
+        conflictos: resultado.conflictos
+      });
+
+      // Actualizar el depósito seleccionado
+      setSelectedDeposito(resultado.deposito);
+
+      if (resultado.conflictos.length > 0) {
+        toast.warning(`Se importaron ${resultado.codigosNuevos} códigos. ${resultado.conflictos.length} códigos duplicados fueron omitidos.`);
+      } else {
+        toast.success(`Se importaron ${resultado.codigosNuevos} códigos correctamente`);
+      }
+
+      // Limpiar el input file
+      setCsvFile(null);
+
+    } catch (error: any) {
+      toast.error(error.message);
+      setResultadoImportacion(null);
+    } finally {
+      setImportandoCSV(false);
     }
   };
 
@@ -930,10 +1017,157 @@ const DepositosPage = () => {
                       </tr>
                     </tfoot>
                   </Table>
-                  <Button variant="outline-success" size="sm" onClick={handleAddProducto}>
+                  <Button variant="outline-success" size="sm" onClick={handleAddProducto} className="mb-4">
                     <i className="bi bi-plus-circle me-2"></i>
                     Añadir Producto
                   </Button>
+
+                  {/* Sección de Trazabilidad */}
+                  <hr className="my-4" />
+                  <h6 className="fw-bold mb-3">Trazabilidad (Opcional)</h6>
+
+                  <Form.Group className="mb-3">
+                    <Form.Check
+                      type="checkbox"
+                      label="Este depósito requiere trazabilidad (códigos unitarios)"
+                      checked={formData.tieneTrazabilidad}
+                      onChange={(e) => setFormData({ ...formData, tieneTrazabilidad: e.target.checked })}
+                    />
+                  </Form.Group>
+
+                  {formData.tieneTrazabilidad && (
+                    <div className="border rounded p-3 bg-light">
+                      <Row className="g-3">
+                        <Col md={6}>
+                          <Form.Group>
+                            <Form.Label>Código de Lote</Form.Label>
+                            <Form.Control
+                              type="text"
+                              placeholder="Ej: LOT-2025-001"
+                              value={formData.codigoLote}
+                              onChange={(e) => setFormData({ ...formData, codigoLote: e.target.value.toUpperCase() })}
+                            />
+                            <Form.Text className="text-muted">Código del lote o caja contenedora</Form.Text>
+                          </Form.Group>
+                        </Col>
+                        <Col md={6}>
+                          <Form.Group>
+                            <Form.Label>Tipo de Lote</Form.Label>
+                            <Form.Select
+                              value={formData.tipoLote}
+                              onChange={(e) => setFormData({ ...formData, tipoLote: e.target.value as 'innerbox' | 'masterbox' | '' })}
+                            >
+                              <option value="">Seleccionar tipo...</option>
+                              <option value="innerbox">Inner Box (Caja Interior)</option>
+                              <option value="masterbox">Master Box (Caja Principal)</option>
+                            </Form.Select>
+                          </Form.Group>
+                        </Col>
+                        <Col md={12}>
+                          <Form.Group>
+                            <Form.Label>Códigos Unitarios</Form.Label>
+                            <Form.Control
+                              as="textarea"
+                              rows={4}
+                              placeholder="Introduce los códigos unitarios, uno por línea&#10;Ejemplo:&#10;SN-2025-0001&#10;SN-2025-0002&#10;SN-2025-0003"
+                              value={formData.codigosUnitarios.join('\n')}
+                              onChange={(e) => {
+                                const codigos = e.target.value
+                                  .split('\n')
+                                  .map(c => c.trim().toUpperCase())
+                                  .filter(c => c.length > 0);
+                                setFormData({ ...formData, codigosUnitarios: codigos });
+                              }}
+                            />
+                            <Form.Text className="text-muted">
+                              Introduce un código por línea. Total: {formData.codigosUnitarios.length} código(s)
+                            </Form.Text>
+                          </Form.Group>
+                        </Col>
+
+                        {/* Importar desde CSV - Solo en modo edición */}
+                        {modalMode === 'edit' && selectedDeposito && (
+                          <Col md={12}>
+                            <hr className="my-3" />
+                            <h6 className="fw-bold mb-3">Importar desde CSV</h6>
+                            <InputGroup className="mb-3">
+                              <Form.Control
+                                type="file"
+                                accept=".csv,.txt,.xlsx,.xls"
+                                onChange={handleCsvFileChange}
+                                disabled={importandoCSV}
+                              />
+                              <Button
+                                variant="primary"
+                                onClick={handleImportarCSV}
+                                disabled={!csvFile || importandoCSV}
+                              >
+                                {importandoCSV ? (
+                                  <>
+                                    <Spinner animation="border" size="sm" className="me-2" />
+                                    Importando...
+                                  </>
+                                ) : (
+                                  <>
+                                    <i className="bi bi-upload me-2"></i>
+                                    Importar CSV
+                                  </>
+                                )}
+                              </Button>
+                            </InputGroup>
+                            <Form.Text className="text-muted d-block mb-2">
+                              <strong>Formatos aceptados:</strong>
+                              <br />1. CSV con columna "product_sn" (exportado desde Excel)
+                              <br />2. Texto plano: un código por línea
+                            </Form.Text>
+
+                            {/* Resultado de importación */}
+                            {resultadoImportacion && (
+                              <Alert variant={resultadoImportacion.conflictos.length > 0 ? 'warning' : 'success'} className="mt-3">
+                                <h6 className="alert-heading">
+                                  <i className="bi bi-check-circle me-2"></i>
+                                  Importación completada
+                                </h6>
+                                <p className="mb-1">
+                                  <strong>Códigos nuevos importados:</strong> {resultadoImportacion.codigosNuevos}
+                                </p>
+                                {resultadoImportacion.conflictos.length > 0 && (
+                                  <>
+                                    <p className="mb-2">
+                                      <strong>Códigos duplicados omitidos:</strong> {resultadoImportacion.conflictos.length}
+                                    </p>
+                                    <details>
+                                      <summary className="cursor-pointer">Ver códigos duplicados</summary>
+                                      <ul className="mb-0 mt-2">
+                                        {resultadoImportacion.conflictos.slice(0, 10).map((conflicto, idx) => (
+                                          <li key={idx}>
+                                            <code>{conflicto.codigo}</code> - Ya existe en depósito {conflicto.depositoExistente}
+                                          </li>
+                                        ))}
+                                        {resultadoImportacion.conflictos.length > 10 && (
+                                          <li>... y {resultadoImportacion.conflictos.length - 10} más</li>
+                                        )}
+                                      </ul>
+                                    </details>
+                                  </>
+                                )}
+                              </Alert>
+                            )}
+                          </Col>
+                        )}
+
+                        <Col md={12}>
+                          <Alert variant="info" className="mb-0">
+                            <i className="bi bi-info-circle me-2"></i>
+                            <strong>Nota:</strong> {modalMode === 'create'
+                              ? 'También podrás importar códigos desde un archivo CSV después de crear el depósito.'
+                              : 'Usa la sección de arriba para importar códigos desde un archivo CSV.'
+                            }
+                          </Alert>
+                        </Col>
+                      </Row>
+                    </div>
+                  )}
                 </div>
               )}
 

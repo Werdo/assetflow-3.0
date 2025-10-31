@@ -13,6 +13,12 @@ const emplazamientoSchema = new mongoose.Schema({
     required: [true, 'El cliente es requerido'],
     index: true
   },
+  subcliente: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Cliente',
+    default: null,
+    index: true
+  },
   nombre: {
     type: String,
     required: [true, 'El nombre del emplazamiento es requerido'],
@@ -176,6 +182,7 @@ emplazamientoSchema.methods.toPublicJSON = function() {
     _id: this._id,
     codigo: this.codigo,
     cliente: this.cliente,
+    subcliente: this.subcliente,
     nombre: this.nombre,
     direccion: this.direccion,
     coordenadas: this.coordenadas,

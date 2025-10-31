@@ -41,6 +41,17 @@ const clienteSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  esSubcliente: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  clientePrincipal: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Cliente',
+    default: null,
+    index: true
+  },
   observaciones: {
     type: String,
     trim: true
@@ -49,31 +60,62 @@ const clienteSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Pre-save hook: Auto-generate codigo if not provided (CLI-XXXXX format)
+// Pre-save hook: Auto-generate codigo if not provided (CLI-XXXXX or SUB-CLI-XXXXX format)
 clienteSchema.pre('save', async function(next) {
   try {
+    // Validación: Si es subcliente, debe tener cliente principal
+    if (this.esSubcliente && !this.clientePrincipal) {
+      return next(new Error('Un subcliente debe tener un cliente principal asignado'));
+    }
+
+    // Validación: Si no es subcliente, no debe tener cliente principal
+    if (!this.esSubcliente && this.clientePrincipal) {
+      this.clientePrincipal = null;
+    }
+
     // Only generate codigo if it's a new document and codigo is not provided
     if (this.isNew && !this.codigo) {
       const Cliente = this.constructor;
 
-      // Find the latest cliente with codigo starting with 'CLI-'
-      const lastCliente = await Cliente.findOne({ codigo: /^CLI-/ })
-        .sort({ codigo: -1 })
-        .limit(1)
-        .select('codigo')
-        .lean();
+      if (this.esSubcliente) {
+        // Generar código para subcliente: SUB-CLI-XXXXX
+        const lastSubcliente = await Cliente.findOne({ codigo: /^SUB-CLI-/ })
+          .sort({ codigo: -1 })
+          .limit(1)
+          .select('codigo')
+          .lean();
 
-      let nextNumber = 1;
-      if (lastCliente && lastCliente.codigo) {
-        // Extract number from codigo (CLI-00001 -> 00001 -> 1)
-        const match = lastCliente.codigo.match(/^CLI-(\d+)$/);
-        if (match) {
-          nextNumber = parseInt(match[1], 10) + 1;
+        let nextNumber = 1;
+        if (lastSubcliente && lastSubcliente.codigo) {
+          // Extract number from codigo (SUB-CLI-00001 -> 00001 -> 1)
+          const match = lastSubcliente.codigo.match(/^SUB-CLI-(\d+)$/);
+          if (match) {
+            nextNumber = parseInt(match[1], 10) + 1;
+          }
         }
-      }
 
-      // Generate new codigo with 5-digit zero-padded number
-      this.codigo = `CLI-${String(nextNumber).padStart(5, '0')}`;
+        // Generate new codigo with 5-digit zero-padded number
+        this.codigo = `SUB-CLI-${String(nextNumber).padStart(5, '0')}`;
+      } else {
+        // Generar código para cliente principal: CLI-XXXXX
+        const lastCliente = await Cliente.findOne({ codigo: /^CLI-/ })
+          .sort({ codigo: -1 })
+          .limit(1)
+          .select('codigo')
+          .lean();
+
+        let nextNumber = 1;
+        if (lastCliente && lastCliente.codigo) {
+          // Extract number from codigo (CLI-00001 -> 00001 -> 1)
+          const match = lastCliente.codigo.match(/^CLI-(\d+)$/);
+          if (match) {
+            nextNumber = parseInt(match[1], 10) + 1;
+          }
+        }
+
+        // Generate new codigo with 5-digit zero-padded number
+        this.codigo = `CLI-${String(nextNumber).padStart(5, '0')}`;
+      }
     }
 
     next();
@@ -88,12 +130,22 @@ clienteSchema.index({ cif: 1 }, { unique: true });
 clienteSchema.index({ nombre: 1 });
 clienteSchema.index({ activo: 1 });
 clienteSchema.index({ 'contacto.email': 1 });
+clienteSchema.index({ esSubcliente: 1 });
+clienteSchema.index({ clientePrincipal: 1 });
 
 // Virtual para emplazamientos del cliente
 clienteSchema.virtual('emplazamientos', {
   ref: 'Emplazamiento',
   localField: '_id',
   foreignField: 'cliente',
+  justOne: false
+});
+
+// Virtual para subclientes de este cliente
+clienteSchema.virtual('subclientes', {
+  ref: 'Cliente',
+  localField: '_id',
+  foreignField: 'clientePrincipal',
   justOne: false
 });
 
@@ -129,6 +181,8 @@ clienteSchema.methods.toPublicJSON = function() {
     direccion: this.direccion,
     contacto: this.contacto,
     activo: this.activo,
+    esSubcliente: this.esSubcliente,
+    clientePrincipal: this.clientePrincipal,
     observaciones: this.observaciones,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt

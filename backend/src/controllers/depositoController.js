@@ -16,6 +16,7 @@ const logger = require('../utils/logger');
 exports.getDepositos = asyncHandler(async (req, res) => {
   const {
     cliente,
+    subcliente,
     emplazamiento,
     producto,
     estado,
@@ -37,13 +38,21 @@ exports.getDepositos = asyncHandler(async (req, res) => {
     query.activo = true; // Default: solo mostrar depósitos activos
   }
 
-  // Note: cliente filter is handled through emplazamiento relationship
+  // Filtro por cliente (now stored directly in Deposito model)
   if (cliente) {
-    // Find emplazamientos that belong to this cliente
-    const emplazamientosDelCliente = await Emplazamiento.find({ cliente }).select('_id');
-    const emplazamientoIds = emplazamientosDelCliente.map(e => e._id);
-    query.emplazamiento = { $in: emplazamientoIds };
-  } else if (emplazamiento) {
+    query.cliente = cliente;
+  }
+
+  // Filtro por subcliente
+  if (subcliente !== undefined) {
+    if (subcliente === 'null' || subcliente === '') {
+      query.subcliente = null;
+    } else {
+      query.subcliente = subcliente;
+    }
+  }
+
+  if (emplazamiento) {
     query.emplazamiento = emplazamiento;
   }
 
@@ -69,12 +78,14 @@ exports.getDepositos = asyncHandler(async (req, res) => {
   const [depositos, total] = await Promise.all([
     Deposito.find(query)
       .populate('producto', 'codigo nombre categoria unidadMedida')
+      .populate('cliente', 'codigo nombre cif')
+      .populate('subcliente', 'codigo nombre')
       .populate({
         path: 'emplazamiento',
-        select: 'nombre direccion cliente',
+        select: 'nombre codigo direccion cliente',
         populate: {
           path: 'cliente',
-          select: 'nombre cif'
+          select: 'nombre codigo cif'
         }
       })
       .sort({ [sortBy]: sortOrder })
@@ -124,12 +135,14 @@ exports.getDepositos = asyncHandler(async (req, res) => {
 exports.getDeposito = asyncHandler(async (req, res) => {
   const deposito = await Deposito.findById(req.params.id)
     .populate('producto', 'codigo nombre descripcion categoria precioUnitario unidadMedida')
+    .populate('cliente', 'codigo nombre cif direccion contacto')
+    .populate('subcliente', 'codigo nombre cif')
     .populate({
       path: 'emplazamiento',
-      select: 'nombre direccion coordenadas contacto cliente',
+      select: 'nombre codigo direccion coordenadas contacto cliente',
       populate: {
         path: 'cliente',
-        select: 'nombre cif direccion contacto'
+        select: 'nombre codigo cif direccion contacto'
       }
     });
 
@@ -176,6 +189,7 @@ exports.createDeposito = asyncHandler(async (req, res) => {
   const {
     producto,
     cliente,
+    subcliente,
     emplazamiento,
     cantidad,
     valorUnitario,
@@ -202,6 +216,24 @@ exports.createDeposito = asyncHandler(async (req, res) => {
   }
   if (!clienteDoc.activo) {
     throw new ValidationError('El cliente está inactivo');
+  }
+
+  // Si se especifica subcliente, verificar que existe y pertenece al cliente
+  let subclienteDoc = null;
+  if (subcliente) {
+    subclienteDoc = await Cliente.findById(subcliente);
+    if (!subclienteDoc) {
+      throw new ValidationError('Subcliente no encontrado');
+    }
+    if (!subclienteDoc.esSubcliente) {
+      throw new ValidationError('El ID especificado no corresponde a un subcliente');
+    }
+    if (!subclienteDoc.clientePrincipal || subclienteDoc.clientePrincipal.toString() !== cliente) {
+      throw new ValidationError('El subcliente no pertenece al cliente especificado');
+    }
+    if (!subclienteDoc.activo) {
+      throw new ValidationError('El subcliente está inactivo');
+    }
   }
 
   // Verificar que emplazamiento existe, está activo y pertenece al cliente
@@ -234,10 +266,11 @@ exports.createDeposito = asyncHandler(async (req, res) => {
   const numeroDeposito = await generarNumeroDeposito();
 
   // Crear depósito (el pre-save hook calculará valorTotal y estado automáticamente)
-  // NOTE: cliente is NOT stored in Deposito schema - it's accessed through emplazamiento
   const deposito = await Deposito.create({
     numeroDeposito,
     producto,
+    cliente,
+    subcliente: subcliente || null,
     emplazamiento,
     cantidad,
     valorUnitario: valorUnitario || productoDoc.precioUnitario,
@@ -250,12 +283,14 @@ exports.createDeposito = asyncHandler(async (req, res) => {
 
   await deposito.populate([
     { path: 'producto', select: 'codigo nombre' },
+    { path: 'cliente', select: 'codigo nombre cif' },
+    { path: 'subcliente', select: 'codigo nombre' },
     {
       path: 'emplazamiento',
-      select: 'nombre cliente',
+      select: 'nombre codigo cliente',
       populate: {
         path: 'cliente',
-        select: 'nombre cif'
+        select: 'nombre codigo cif'
       }
     }
   ]);
@@ -282,6 +317,7 @@ exports.createDeposito = asyncHandler(async (req, res) => {
     depositoId: deposito._id,
     numeroDeposito: deposito.numeroDeposito,
     cliente: clienteDoc.nombre,
+    subcliente: subclienteDoc ? subclienteDoc.nombre : null,
     producto: productoDoc.codigo,
     cantidad: deposito.cantidad,
     valorTotal: deposito.valorTotal,
@@ -893,6 +929,233 @@ exports.getEstadisticas = asyncHandler(async (req, res) => {
         proximosVencer: proximosVencer.length,
         vencidos: vencidos.length
       }
+    }
+  });
+});
+
+/**
+ * @desc    Buscar depósito por código unitario
+ * @route   GET /api/depositos/buscar-codigo/:codigo
+ * @access  Private
+ */
+exports.buscarPorCodigoUnitario = asyncHandler(async (req, res) => {
+  const { codigo } = req.params;
+
+  if (!codigo || codigo.trim() === '') {
+    throw new ValidationError('El código unitario es requerido');
+  }
+
+  const deposito = await Deposito.buscarPorCodigoUnitario(codigo);
+
+  if (!deposito) {
+    return res.status(404).json({
+      success: false,
+      message: 'No se encontró ningún depósito con ese código unitario'
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      deposito: deposito.toPublicJSON()
+    }
+  });
+});
+
+/**
+ * @desc    Añadir códigos unitarios a un depósito
+ * @route   POST /api/depositos/:id/codigos
+ * @access  Private
+ */
+exports.agregarCodigosUnitarios = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { codigos } = req.body;
+
+  if (!codigos || !Array.isArray(codigos) || codigos.length === 0) {
+    throw new ValidationError('Debe proporcionar al menos un código unitario');
+  }
+
+  const deposito = await Deposito.findById(id);
+  if (!deposito) {
+    throw new NotFoundError('Depósito');
+  }
+
+  // Limpiar y validar códigos
+  const codigosLimpios = codigos
+    .map(c => c.trim().toUpperCase())
+    .filter(c => c.length > 0);
+
+  if (codigosLimpios.length === 0) {
+    throw new ValidationError('Ninguno de los códigos proporcionados es válido');
+  }
+
+  // Verificar si algún código ya existe en otro depósito
+  const depositosExistentes = await Deposito.find({
+    codigosUnitarios: { $in: codigosLimpios },
+    _id: { $ne: id }
+  }).select('numeroDeposito codigosUnitarios');
+
+  if (depositosExistentes.length > 0) {
+    const codigosConflicto = [];
+    depositosExistentes.forEach(dep => {
+      const conflictos = dep.codigosUnitarios.filter(c => codigosLimpios.includes(c));
+      conflictos.forEach(c => {
+        codigosConflicto.push({
+          codigo: c,
+          deposito: dep.numeroDeposito
+        });
+      });
+    });
+
+    return res.status(400).json({
+      success: false,
+      message: 'Algunos códigos ya existen en otros depósitos',
+      data: {
+        conflictos: codigosConflicto
+      }
+    });
+  }
+
+  // Añadir códigos sin duplicar
+  const codigosActuales = new Set(deposito.codigosUnitarios || []);
+  const codigosNuevos = codigosLimpios.filter(c => !codigosActuales.has(c));
+
+  if (codigosNuevos.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Todos los códigos ya existen en este depósito'
+    });
+  }
+
+  deposito.codigosUnitarios = [...codigosActuales, ...codigosNuevos];
+  await deposito.save();
+
+  logger.info('Códigos unitarios añadidos', {
+    depositoId: deposito._id,
+    numeroDeposito: deposito.numeroDeposito,
+    cantidadNuevos: codigosNuevos.length,
+    totalCodigos: deposito.codigosUnitarios.length
+  });
+
+  res.status(200).json({
+    success: true,
+    message: `${codigosNuevos.length} código(s) añadido(s) correctamente`,
+    data: {
+      deposito: deposito.toPublicJSON(),
+      codigosNuevos: codigosNuevos,
+      totalCodigos: deposito.codigosUnitarios.length
+    }
+  });
+});
+
+/**
+ * @desc    Importar códigos unitarios desde CSV
+ * @route   POST /api/depositos/:id/importar-codigos
+ * @access  Private
+ */
+exports.importarCodigosCSV = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { csvContent } = req.body;
+
+  if (!csvContent || typeof csvContent !== 'string') {
+    throw new ValidationError('Debe proporcionar el contenido del CSV');
+  }
+
+  const deposito = await Deposito.findById(id);
+  if (!deposito) {
+    throw new NotFoundError('Depósito');
+  }
+
+  // Parsear CSV - Detectar formato automáticamente
+  const lineas = csvContent.split(/\r?\n/).filter(l => l.trim().length > 0);
+
+  let codigos = [];
+
+  // Verificar si tiene cabecera "product_sn" (formato Excel estándar)
+  if (lineas.length > 0 && lineas[0].toLowerCase().includes('product_sn')) {
+    // Formato CSV con cabecera
+    const headerIndex = lineas[0].toLowerCase().split(',').findIndex(col => col.trim() === 'product_sn');
+
+    if (headerIndex !== -1) {
+      // Extraer valores de la columna product_sn
+      // Soporta múltiples códigos por celda separados por espacio
+      codigos = lineas.slice(1).flatMap(linea => {
+        const columnas = linea.split(',');
+        const valor = columnas[headerIndex] ? columnas[headerIndex].trim() : '';
+        if (!valor) return [];
+
+        // Separar múltiples códigos si están en la misma celda
+        return valor.split(/[\s;]+/)
+          .map(c => c.trim().toUpperCase())
+          .filter(c => c.length > 0);
+      });
+    } else {
+      // Si tiene cabecera pero no es product_sn, saltar primera línea
+      codigos = lineas.slice(1).flatMap(linea => {
+        return linea.split(/[\s,;\t]+/)
+          .map(c => c.trim().toUpperCase())
+          .filter(c => c.length > 0);
+      });
+    }
+  } else {
+    // Formato simple: una línea por código
+    // Soporta múltiples códigos por línea separados por espacio, coma o tab
+    // Ejemplo: "861888081796522 8934013132319434302F" (IMEI + ICCID de baliza)
+    codigos = lineas.flatMap(linea => {
+      // Separar por espacio, coma, punto y coma o tab
+      return linea.split(/[\s,;\t]+/)
+        .map(c => c.trim().toUpperCase())
+        .filter(c => c.length > 0);
+    });
+  }
+
+  if (codigos.length === 0) {
+    throw new ValidationError('El archivo CSV no contiene códigos válidos');
+  }
+
+  // Verificar duplicados en otros depósitos
+  const depositosExistentes = await Deposito.find({
+    codigosUnitarios: { $in: codigos },
+    _id: { $ne: id }
+  }).select('numeroDeposito codigosUnitarios');
+
+  const codigosConflicto = [];
+  if (depositosExistentes.length > 0) {
+    depositosExistentes.forEach(dep => {
+      const conflictos = dep.codigosUnitarios.filter(c => codigos.includes(c));
+      conflictos.forEach(c => {
+        codigosConflicto.push({
+          codigo: c,
+          deposito: dep.numeroDeposito
+        });
+      });
+    });
+  }
+
+  // Añadir códigos sin duplicar
+  const codigosActuales = new Set(deposito.codigosUnitarios || []);
+  const codigosNuevos = codigos.filter(c => !codigosActuales.has(c));
+
+  deposito.codigosUnitarios = [...codigosActuales, ...codigosNuevos];
+  await deposito.save();
+
+  logger.info('Códigos unitarios importados desde CSV', {
+    depositoId: deposito._id,
+    numeroDeposito: deposito.numeroDeposito,
+    totalLineas: lineas.length,
+    codigosNuevos: codigosNuevos.length,
+    codigosConflicto: codigosConflicto.length,
+    totalCodigos: deposito.codigosUnitarios.length
+  });
+
+  res.status(200).json({
+    success: true,
+    message: `Importación completada: ${codigosNuevos.length} nuevos, ${codigosConflicto.length} conflictos`,
+    data: {
+      deposito: deposito.toPublicJSON(),
+      codigosNuevos: codigosNuevos.length,
+      conflictos: codigosConflicto,
+      totalCodigos: deposito.codigosUnitarios.length
     }
   });
 });
