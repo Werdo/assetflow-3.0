@@ -58,10 +58,43 @@ exports.getEmplazamientos = asyncHandler(async (req, res) => {
     Emplazamiento.countDocuments(query)
   ]);
 
+  // Get statistics for each emplazamiento
+  const Deposito = require('../models/Deposito');
+  const emplazamientosConEstadisticas = await Promise.all(
+    emplazamientos.map(async (emp) => {
+      const depositos = await Deposito.find({
+        emplazamiento: emp._id,
+        activo: true
+      });
+
+      const valorTotal = depositos.reduce((sum, dep) => sum + (dep.valorTotal || 0), 0);
+      const depositosActivos = depositos.length;
+
+      // Calculate días mínimo to expiration
+      let diasMinimo = null;
+      const now = new Date();
+      depositos.forEach(dep => {
+        if (dep.fechaVencimiento) {
+          const diff = Math.floor((dep.fechaVencimiento - now) / (1000 * 60 * 60 * 24));
+          if (diasMinimo === null || diff < diasMinimo) {
+            diasMinimo = diff;
+          }
+        }
+      });
+
+      return {
+        ...emp.toPublicJSON(),
+        valorTotal,
+        depositosActivos,
+        diasMinimo
+      };
+    })
+  );
+
   res.status(200).json({
     success: true,
     data: {
-      emplazamientos: emplazamientos.map(e => e.toPublicJSON()),
+      emplazamientos: emplazamientosConEstadisticas,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),

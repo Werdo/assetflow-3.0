@@ -131,6 +131,7 @@ export interface Emplazamiento {
   codigo: string;
   nombre: string;
   cliente: string | Cliente;
+  subcliente?: string | Cliente;
 
   // Ubicación física
   direccion: string;
@@ -154,6 +155,11 @@ export interface Emplazamiento {
 
   // Estado
   estado: 'activo' | 'inactivo';
+
+  // Estadísticas (incluidas en lista)
+  valorTotal?: number;
+  depositosActivos?: number;
+  diasMinimo?: number | null;
 
   observaciones?: string;
   createdAt: string;

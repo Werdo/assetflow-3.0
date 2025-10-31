@@ -94,69 +94,81 @@ export const RobustMapView: React.FC<RobustMapViewProps> = ({
 
         emplazamientos.forEach((emp, index) => {
           if (!emp.coordenadas || !emp.coordenadas.lat || !emp.coordenadas.lng) {
-            console.warn('[RobustMapView] Emplazamiento sin coordenadas:', emp._id);
+            console.warn('[RobustMapView] Emplazamiento sin coordenadas:', emp._id, emp.nombre);
             return;
           }
 
           const lat = emp.coordenadas.lat;
           const lng = emp.coordenadas.lng;
+
+          console.log(`[RobustMapView] Procesando marcador ${index + 1}/${emplazamientos.length}:`, {
+            nombre: emp.nombre,
+            lat,
+            lng,
+            estado: emp.estado
+          });
+
           bounds.push([lat, lng]);
 
-          // Determinar color según estado con todos los casos posibles
+          // Determinar color según estado
           let color = '#28a745'; // Verde por defecto
-          let iconText = '•';
-
           const estado = emp.estado?.toLowerCase() || 'verde';
 
           if (estado === 'critico' || estado === 'rojo' || estado === 'vencido') {
             color = '#dc3545'; // Rojo
-            iconText = '!';
           } else if (estado === 'proximo_vencimiento' || estado === 'amarillo' || estado === 'advertencia') {
             color = '#ffc107'; // Amarillo
-            iconText = '⚠';
           } else if (estado === 'verde' || estado === 'normal' || estado === 'ok') {
             color = '#28a745'; // Verde
-            iconText = '✓';
           }
 
-          // Crear icono personalizado tipo pin con SVG
+          // Usar icono por defecto de Leaflet con color personalizado
           const icon = L.divIcon({
-            className: 'custom-marker-icon',
+            className: 'custom-map-marker',
             html: `
-              <div style="position: relative; width: 36px; height: 46px;">
-                <svg width="36" height="46" viewBox="0 0 36 46" xmlns="http://www.w3.org/2000/svg">
-                  <!-- Sombra -->
-                  <ellipse cx="18" cy="44" rx="8" ry="2" fill="rgba(0,0,0,0.2)" />
-
-                  <!-- Pin principal -->
-                  <path d="M18 0C10.268 0 4 6.268 4 14c0 10.5 14 30 14 30s14-19.5 14-30c0-7.732-6.268-14-14-14z"
-                        fill="${color}"
-                        stroke="white"
-                        stroke-width="2"/>
-
-                  <!-- Círculo interior blanco -->
-                  <circle cx="18" cy="14" r="7" fill="white"/>
-
-                  <!-- Texto/símbolo -->
-                  <text x="18" y="19"
-                        text-anchor="middle"
-                        font-size="16"
-                        font-weight="bold"
-                        fill="${color}">${iconText}</text>
-                </svg>
+              <div style="
+                width: 30px;
+                height: 30px;
+                background-color: ${color};
+                border: 3px solid white;
+                border-radius: 50%;
+                box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+              ">
+                <div style="
+                  width: 12px;
+                  height: 12px;
+                  background-color: white;
+                  border-radius: 50%;
+                "></div>
               </div>
             `,
-            iconSize: [36, 46],
-            iconAnchor: [18, 46],
-            popupAnchor: [0, -46],
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
+            popupAnchor: [0, -15],
           });
 
           // Crear marcador
           const marker = L.marker([lat, lng], { icon });
 
-          console.log(`[RobustMapView] Marcador ${index + 1}/${emplazamientos.length}: ${emp.nombre} (${estado}) at [${lat}, ${lng}]`);
+          // Tooltip on hover (onmouseover)
+          const tooltipContent = `
+            <div style="padding: 4px;">
+              <strong>${emp.nombre}</strong><br />
+              <small>${emp.cliente?.nombre || 'Sin cliente'}</small><br />
+              <small><strong>${emp.depositosActivos || 0}</strong> depósitos - <strong>€${(emp.valorTotal || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</strong></small>
+            </div>
+          `;
+          marker.bindTooltip(tooltipContent, {
+            permanent: false,
+            direction: 'top',
+            offset: [0, -10]
+          });
 
-          // Crear popup
+          // Popup on click con información detallada
           const popupContent = `
             <div style="min-width: 250px;">
               <h6 style="font-weight: bold; margin-bottom: 8px;">${emp.nombre}</h6>
@@ -183,8 +195,14 @@ export const RobustMapView: React.FC<RobustMapViewProps> = ({
           `;
 
           marker.bindPopup(popupContent);
+
+          // Añadir al mapa EXPLÍCITAMENTE
           marker.addTo(map);
+
+          console.log(`[RobustMapView] ✓ Marcador ${index + 1} añadido al mapa:`, emp.nombre);
         });
+
+        console.log(`[RobustMapView] Total de ${bounds.length} marcadores añadidos al mapa`);
 
         // Ajustar vista a los marcadores
         if (bounds.length > 0) {
@@ -272,27 +290,36 @@ export const RobustMapView: React.FC<RobustMapViewProps> = ({
           <div className="d-flex gap-3 align-items-center">
             <small className="text-muted fw-bold">Leyenda:</small>
             <div className="d-flex align-items-center gap-1">
-              <svg width="16" height="20" viewBox="0 0 36 46">
-                <path d="M18 0C10.268 0 4 6.268 4 14c0 10.5 14 30 14 30s14-19.5 14-30c0-7.732-6.268-14-14-14z"
-                      fill="#28a745" stroke="white" stroke-width="2"/>
-                <circle cx="18" cy="14" r="7" fill="white"/>
-              </svg>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                backgroundColor: '#28a745',
+                border: '2px solid white',
+                borderRadius: '50%',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+              }}></div>
               <small className="text-muted"><strong className="text-success">Normal</strong> (&gt; 30 días)</small>
             </div>
             <div className="d-flex align-items-center gap-1">
-              <svg width="16" height="20" viewBox="0 0 36 46">
-                <path d="M18 0C10.268 0 4 6.268 4 14c0 10.5 14 30 14 30s14-19.5 14-30c0-7.732-6.268-14-14-14z"
-                      fill="#ffc107" stroke="white" stroke-width="2"/>
-                <circle cx="18" cy="14" r="7" fill="white"/>
-              </svg>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                backgroundColor: '#ffc107',
+                border: '2px solid white',
+                borderRadius: '50%',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+              }}></div>
               <small className="text-muted"><strong className="text-warning">Advertencia</strong> (7-30 días)</small>
             </div>
             <div className="d-flex align-items-center gap-1">
-              <svg width="16" height="20" viewBox="0 0 36 46">
-                <path d="M18 0C10.268 0 4 6.268 4 14c0 10.5 14 30 14 30s14-19.5 14-30c0-7.732-6.268-14-14-14z"
-                      fill="#dc3545" stroke="white" stroke-width="2"/>
-                <circle cx="18" cy="14" r="7" fill="white"/>
-              </svg>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                backgroundColor: '#dc3545',
+                border: '2px solid white',
+                borderRadius: '50%',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+              }}></div>
               <small className="text-muted"><strong className="text-danger">Crítico</strong> (&lt; 7 días)</small>
             </div>
           </div>

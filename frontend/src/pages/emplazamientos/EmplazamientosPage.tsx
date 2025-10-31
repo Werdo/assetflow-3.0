@@ -31,10 +31,26 @@ export const EmplazamientosPage = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingEmplazamiento, setEditingEmplazamiento] = useState<Emplazamiento | null>(null);
+  const [geocoding, setGeocoding] = useState(false);
+
+  // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState<string>('all');
   const [filterCliente, setFilterCliente] = useState<string>('all');
-  const [geocoding, setGeocoding] = useState(false);
+  const [filterSubcliente, setFilterSubcliente] = useState<string>('all');
+  const [filterValorMin, setFilterValorMin] = useState<string>('');
+  const [filterValorMax, setFilterValorMax] = useState<string>('');
+  const [filterDepositosMin, setFilterDepositosMin] = useState<string>('');
+  const [filterDepositosMax, setFilterDepositosMax] = useState<string>('');
+  const [filterDiasMin, setFilterDiasMin] = useState<string>('');
+
+  // Ordenamiento
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Paginación
+  const [itemsPerPage, setItemsPerPage] = useState<number>(50);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   const [formData, setFormData] = useState<EmplazamientoFormData>({
     codigo: '',
@@ -231,15 +247,103 @@ export const EmplazamientosPage = () => {
     }
   };
 
+  // Helper para ordenar
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+    setCurrentPage(1);
+  };
+
+  // Obtener subclientes disponibles
+  const subclientes = clientes.filter(c => c.esSubcliente);
+
+  // Filtrado
   const emplazamientosFiltrados = emplazamientos.filter((e) => {
-    const matchesSearch = e.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    // Búsqueda por texto
+    const matchesSearch = searchTerm === '' ||
+                         e.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          e.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          e.ciudad.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Filtro por estado
     const matchesEstado = filterEstado === 'all' || e.estado === filterEstado;
+
+    // Filtro por cliente
     const matchesCliente = filterCliente === 'all' ||
                           (typeof e.cliente === 'string' ? e.cliente === filterCliente : e.cliente._id === filterCliente);
-    return matchesSearch && matchesEstado && matchesCliente;
+
+    // Filtro por subcliente
+    const matchesSubcliente = filterSubcliente === 'all' ||
+                             (e.subcliente && (typeof e.subcliente === 'string' ? e.subcliente === filterSubcliente : e.subcliente._id === filterSubcliente));
+
+    // Filtro por valor total
+    const valor = e.valorTotal || 0;
+    const matchesValorMin = filterValorMin === '' || valor >= parseFloat(filterValorMin);
+    const matchesValorMax = filterValorMax === '' || valor <= parseFloat(filterValorMax);
+
+    // Filtro por depósitos activos
+    const depositos = e.depositosActivos || 0;
+    const matchesDepositosMin = filterDepositosMin === '' || depositos >= parseInt(filterDepositosMin);
+    const matchesDepositosMax = filterDepositosMax === '' || depositos <= parseInt(filterDepositosMax);
+
+    // Filtro por días mínimos
+    const matchesDiasMin = filterDiasMin === '' || (e.diasMinimo !== null && e.diasMinimo !== undefined && e.diasMinimo >= parseInt(filterDiasMin));
+
+    return matchesSearch && matchesEstado && matchesCliente && matchesSubcliente &&
+           matchesValorMin && matchesValorMax && matchesDepositosMin && matchesDepositosMax && matchesDiasMin;
   });
+
+  // Ordenamiento
+  const emplazamientosOrdenados = [...emplazamientosFiltrados].sort((a, b) => {
+    let aVal: any;
+    let bVal: any;
+
+    switch (sortBy) {
+      case 'codigo':
+        aVal = a.codigo;
+        bVal = b.codigo;
+        break;
+      case 'nombre':
+        aVal = a.nombre;
+        bVal = b.nombre;
+        break;
+      case 'ciudad':
+        aVal = a.ciudad;
+        bVal = b.ciudad;
+        break;
+      case 'valorTotal':
+        aVal = a.valorTotal || 0;
+        bVal = b.valorTotal || 0;
+        break;
+      case 'depositosActivos':
+        aVal = a.depositosActivos || 0;
+        bVal = b.depositosActivos || 0;
+        break;
+      case 'diasMinimo':
+        aVal = a.diasMinimo === null || a.diasMinimo === undefined ? Infinity : a.diasMinimo;
+        bVal = b.diasMinimo === null || b.diasMinimo === undefined ? Infinity : b.diasMinimo;
+        break;
+      case 'createdAt':
+      default:
+        aVal = new Date(a.createdAt);
+        bVal = new Date(b.createdAt);
+        break;
+    }
+
+    if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Paginación
+  const totalPages = itemsPerPage === -1 ? 1 : Math.ceil(emplazamientosOrdenados.length / itemsPerPage);
+  const startIndex = itemsPerPage === -1 ? 0 : (currentPage - 1) * itemsPerPage;
+  const endIndex = itemsPerPage === -1 ? emplazamientosOrdenados.length : startIndex + itemsPerPage;
+  const emplazamientosPaginados = emplazamientosOrdenados.slice(startIndex, endIndex);
 
   const getClienteNombre = (cliente: string | Cliente): string => {
     if (typeof cliente === 'string') {
@@ -289,34 +393,100 @@ export const EmplazamientosPage = () => {
         </Col>
       </Row>
 
-      <Row className="mb-4">
-        <Col md={5}>
-          <InputGroup>
+      {/* Filtros Row 1 */}
+      <Row className="mb-3">
+        <Col md={4}>
+          <InputGroup size="sm">
             <InputGroup.Text><i className="bi bi-search"></i></InputGroup.Text>
             <Form.Control
               placeholder="Buscar por nombre, código o ciudad..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             />
           </InputGroup>
         </Col>
-        <Col md={3}>
-          <Form.Select value={filterCliente} onChange={(e) => setFilterCliente(e.target.value)}>
+        <Col md={2}>
+          <Form.Select size="sm" value={filterCliente} onChange={(e) => { setFilterCliente(e.target.value); setCurrentPage(1); }}>
             <option value="all">Todos los clientes</option>
-            {clientes.map(cliente => (
+            {clientes.filter(c => !c.esSubcliente).map(cliente => (
               <option key={cliente._id} value={cliente._id}>{cliente.nombre}</option>
             ))}
           </Form.Select>
         </Col>
         <Col md={2}>
-          <Form.Select value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)}>
-            <option value="all">Todos</option>
+          <Form.Select size="sm" value={filterSubcliente} onChange={(e) => { setFilterSubcliente(e.target.value); setCurrentPage(1); }}>
+            <option value="all">Todos los subclientes</option>
+            {subclientes.map(subcliente => (
+              <option key={subcliente._id} value={subcliente._id}>{subcliente.nombre}</option>
+            ))}
+          </Form.Select>
+        </Col>
+        <Col md={2}>
+          <Form.Select size="sm" value={filterEstado} onChange={(e) => { setFilterEstado(e.target.value); setCurrentPage(1); }}>
+            <option value="all">Todos los estados</option>
             <option value="activo">Activos</option>
             <option value="inactivo">Inactivos</option>
           </Form.Select>
         </Col>
         <Col md={2}>
-          <Button variant="outline-secondary" className="w-100" onClick={cargarDatos}>
+          <Form.Select size="sm" value={itemsPerPage} onChange={(e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); }}>
+            <option value="50">50 por página</option>
+            <option value="100">100 por página</option>
+            <option value="200">200 por página</option>
+            <option value="-1">Todos</option>
+          </Form.Select>
+        </Col>
+      </Row>
+
+      {/* Filtros Row 2 - Rangos numéricos */}
+      <Row className="mb-3">
+        <Col md={2}>
+          <Form.Control
+            type="number"
+            size="sm"
+            placeholder="Valor mín €"
+            value={filterValorMin}
+            onChange={(e) => { setFilterValorMin(e.target.value); setCurrentPage(1); }}
+          />
+        </Col>
+        <Col md={2}>
+          <Form.Control
+            type="number"
+            size="sm"
+            placeholder="Valor máx €"
+            value={filterValorMax}
+            onChange={(e) => { setFilterValorMax(e.target.value); setCurrentPage(1); }}
+          />
+        </Col>
+        <Col md={2}>
+          <Form.Control
+            type="number"
+            size="sm"
+            placeholder="Depósitos mín"
+            value={filterDepositosMin}
+            onChange={(e) => { setFilterDepositosMin(e.target.value); setCurrentPage(1); }}
+          />
+        </Col>
+        <Col md={2}>
+          <Form.Control
+            type="number"
+            size="sm"
+            placeholder="Depósitos máx"
+            value={filterDepositosMax}
+            onChange={(e) => { setFilterDepositosMax(e.target.value); setCurrentPage(1); }}
+          />
+        </Col>
+        <Col md={2}>
+          <Form.Control
+            type="number"
+            size="sm"
+            placeholder="Días mín venc."
+            value={filterDiasMin}
+            onChange={(e) => { setFilterDiasMin(e.target.value); setCurrentPage(1); }}
+          />
+        </Col>
+        <Col md={2}>
+          <Button variant="outline-secondary" size="sm" className="w-100" onClick={cargarDatos}>
             <i className="bi bi-arrow-clockwise me-1"></i>
             Actualizar
           </Button>
@@ -332,85 +502,113 @@ export const EmplazamientosPage = () => {
                   <Spinner animation="border" variant="primary" />
                   <p className="mt-3 text-muted">Cargando emplazamientos...</p>
                 </div>
-              ) : emplazamientosFiltrados.length === 0 ? (
+              ) : emplazamientosOrdenados.length === 0 ? (
                 <Alert variant="info" className="m-4">
                   No se encontraron emplazamientos. {searchTerm && 'Intenta con otros términos de búsqueda.'}
                 </Alert>
               ) : (
                 <div className="table-responsive">
-                  <Table hover className="mb-0">
+                  <Table hover className="mb-0" size="sm">
                     <thead className="table-light">
                       <tr>
-                        <th>Código</th>
-                        <th>Nombre</th>
-                        <th>Cliente</th>
-                        <th>Ciudad</th>
-                        <th>Tipo</th>
+                        <th onClick={() => handleSort('codigo')} style={{ cursor: 'pointer' }}>
+                          Código {sortBy === 'codigo' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th onClick={() => handleSort('nombre')} style={{ cursor: 'pointer' }}>
+                          Nombre {sortBy === 'nombre' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th>Cliente / Subcliente</th>
+                        <th onClick={() => handleSort('ciudad')} style={{ cursor: 'pointer' }}>
+                          Ciudad {sortBy === 'ciudad' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th onClick={() => handleSort('valorTotal')} style={{ cursor: 'pointer' }} className="text-end">
+                          Valor Total {sortBy === 'valorTotal' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th onClick={() => handleSort('depositosActivos')} style={{ cursor: 'pointer' }} className="text-center">
+                          Depósitos {sortBy === 'depositosActivos' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </th>
+                        <th onClick={() => handleSort('diasMinimo')} style={{ cursor: 'pointer' }} className="text-center">
+                          Días Mín {sortBy === 'diasMinimo' && (sortOrder === 'asc' ? '↑' : '↓')}
+                        </th>
                         <th className="text-center">Estado</th>
                         <th className="text-center">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {emplazamientosFiltrados.map((emplazamiento) => {
+                      {emplazamientosPaginados.map((emplazamiento) => {
                         const clientePrincipal = getClientePrincipalFromSubcliente(emplazamiento.subcliente);
                         const subclienteNombre = getSubclienteNombre(emplazamiento.subcliente);
 
                         return (
                           <tr key={emplazamiento._id}>
-                            <td><code>{emplazamiento.codigo}</code></td>
+                            <td><code className="small">{emplazamiento.codigo}</code></td>
                             <td><strong>{emplazamiento.nombre}</strong></td>
                             <td>
                               {clientePrincipal && subclienteNombre ? (
                                 <div>
-                                  <div><strong>{clientePrincipal}</strong></div>
+                                  <div><strong className="small">{clientePrincipal}</strong></div>
                                   <small className="text-muted">└ {subclienteNombre}</small>
                                 </div>
                               ) : (
-                                getClienteNombre(emplazamiento.cliente)
+                                <span className="small">{getClienteNombre(emplazamiento.cliente)}</span>
                               )}
                             </td>
-                            <td>{emplazamiento.ciudad}</td>
-                          <td>
-                            <Badge bg="secondary">
-                              {emplazamiento.tipoAlmacen === 'general' && 'General'}
-                              {emplazamiento.tipoAlmacen === 'refrigerado' && 'Refrigerado'}
-                              {emplazamiento.tipoAlmacen === 'congelado' && 'Congelado'}
-                            </Badge>
-                          </td>
-                          <td className="text-center">
-                            <Badge bg={emplazamiento.estado === 'activo' ? 'success' : 'secondary'}>
-                              {emplazamiento.estado === 'activo' ? 'Activo' : 'Inactivo'}
-                            </Badge>
-                          </td>
-                          <td className="text-center">
-                            <div className="d-flex gap-1 justify-content-center">
-                              <Button
-                                variant="outline-primary"
-                                size="sm"
-                                onClick={() => handleShowModal(emplazamiento)}
-                                title="Editar"
-                              >
-                                <i className="bi bi-pencil"></i>
-                              </Button>
-                              <Button
-                                variant={emplazamiento.estado === 'activo' ? 'outline-warning' : 'outline-success'}
-                                size="sm"
-                                onClick={() => handleToggleEstado(emplazamiento._id, emplazamiento.estado)}
-                                title={emplazamiento.estado === 'activo' ? 'Desactivar' : 'Activar'}
-                              >
-                                <i className={`bi bi-${emplazamiento.estado === 'activo' ? 'eye-slash' : 'eye'}`}></i>
-                              </Button>
-                              <Button
-                                variant="outline-danger"
-                                size="sm"
-                                onClick={() => handleDelete(emplazamiento._id)}
-                                title="Eliminar"
-                              >
-                                <i className="bi bi-trash"></i>
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
+                            <td className="small">{emplazamiento.ciudad}</td>
+                            <td className="text-end">
+                              <strong className="text-success">
+                                €{(emplazamiento.valorTotal || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                              </strong>
+                            </td>
+                            <td className="text-center">
+                              <Badge bg="info">{emplazamiento.depositosActivos || 0}</Badge>
+                            </td>
+                            <td className="text-center">
+                              {emplazamiento.diasMinimo !== null && emplazamiento.diasMinimo !== undefined ? (
+                                <Badge bg={
+                                  emplazamiento.diasMinimo < 7 ? 'danger' :
+                                  emplazamiento.diasMinimo < 30 ? 'warning' :
+                                  'success'
+                                }>
+                                  {emplazamiento.diasMinimo} días
+                                </Badge>
+                              ) : (
+                                <span className="text-muted small">N/A</span>
+                              )}
+                            </td>
+                            <td className="text-center">
+                              <Badge bg={emplazamiento.estado === 'activo' ? 'success' : 'secondary'} className="small">
+                                {emplazamiento.estado === 'activo' ? 'Activo' : 'Inactivo'}
+                              </Badge>
+                            </td>
+                            <td className="text-center">
+                              <div className="d-flex gap-1 justify-content-center">
+                                <Button
+                                  variant="outline-primary"
+                                  size="sm"
+                                  onClick={() => handleShowModal(emplazamiento)}
+                                  title="Editar"
+                                >
+                                  <i className="bi bi-pencil"></i>
+                                </Button>
+                                <Button
+                                  variant={emplazamiento.estado === 'activo' ? 'outline-warning' : 'outline-success'}
+                                  size="sm"
+                                  onClick={() => handleToggleEstado(emplazamiento._id, emplazamiento.estado)}
+                                  title={emplazamiento.estado === 'activo' ? 'Desactivar' : 'Activar'}
+                                >
+                                  <i className={`bi bi-${emplazamiento.estado === 'activo' ? 'eye-slash' : 'eye'}`}></i>
+                                </Button>
+                                <Button
+                                  variant="outline-danger"
+                                  size="sm"
+                                  onClick={() => handleDelete(emplazamiento._id)}
+                                  title="Eliminar"
+                                >
+                                  <i className="bi bi-trash"></i>
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
                         )
                       })}
                     </tbody>
@@ -419,9 +617,35 @@ export const EmplazamientosPage = () => {
               )}
             </Card.Body>
             <Card.Footer className="bg-light">
-              <small className="text-muted">
-                Total: {emplazamientosFiltrados.length} emplazamiento{emplazamientosFiltrados.length !== 1 ? 's' : ''}
-              </small>
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <small className="text-muted">
+                  Mostrando {itemsPerPage === -1 ? emplazamientosOrdenados.length : Math.min(startIndex + 1, emplazamientosOrdenados.length)} - {itemsPerPage === -1 ? emplazamientosOrdenados.length : Math.min(endIndex, emplazamientosOrdenados.length)} de {emplazamientosOrdenados.length} emplazamiento{emplazamientosOrdenados.length !== 1 ? 's' : ''}
+                  {emplazamientosOrdenados.length !== emplazamientos.length && ` (${emplazamientos.length} total)`}
+                </small>
+                {itemsPerPage !== -1 && totalPages > 1 && (
+                  <div className="d-flex gap-2 align-items-center">
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <i className="bi bi-chevron-left"></i>
+                    </Button>
+                    <small className="text-muted">
+                      Página {currentPage} de {totalPages}
+                    </small>
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <i className="bi bi-chevron-right"></i>
+                    </Button>
+                  </div>
+                )}
+              </div>
             </Card.Footer>
           </Card>
         </Col>

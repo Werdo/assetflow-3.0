@@ -288,7 +288,7 @@ exports.getMapaEmplazamientos = asyncHandler(async (req, res) => {
   // Obtener todos los emplazamientos activos
   const emplazamientos = await Emplazamiento.find(query)
     .populate('cliente', 'nombre cif')
-    .select('nombre cliente coordenadas direccion contacto');
+    .select('codigo nombre cliente coordenadas direccion contacto');
 
   // Obtener estadísticas para cada emplazamiento
   const emplazamientosConDatos = await Promise.all(
@@ -318,18 +318,50 @@ exports.getMapaEmplazamientos = asyncHandler(async (req, res) => {
         resuelta: false
       });
 
+      // Calcular días mínimos hasta vencimiento
+      let diasMinimosRestantes = null;
+      const now = new Date();
+      depositos.forEach(dep => {
+        if (dep.fechaVencimiento) {
+          const diff = Math.floor((dep.fechaVencimiento - now) / (1000 * 60 * 60 * 24));
+          if (diasMinimosRestantes === null || diff < diasMinimosRestantes) {
+            diasMinimosRestantes = diff;
+          }
+        }
+      });
+
+      // Determinar estado del emplazamiento basado en días restantes
+      let estado = 'verde';
+      if (diasMinimosRestantes !== null) {
+        if (diasMinimosRestantes < 0) {
+          estado = 'rojo'; // Vencido
+        } else if (diasMinimosRestantes < 7) {
+          estado = 'critico'; // Crítico (< 7 días)
+        } else if (diasMinimosRestantes < 30) {
+          estado = 'amarillo'; // Advertencia (7-30 días)
+        }
+      }
+
+      // Transform coordenadas from GeoJSON format to simple lat/lng format
+      const coordenadasTransformadas = emp.coordenadas && emp.coordenadas.coordinates
+        ? {
+            lat: emp.coordenadas.coordinates[1],  // GeoJSON is [lng, lat]
+            lng: emp.coordenadas.coordinates[0]
+          }
+        : null;
+
       return {
         _id: emp._id,
         nombre: emp.nombre,
+        codigo: emp.codigo,
         cliente: emp.cliente,
-        coordenadas: emp.coordenadas,
-        direccion: emp.direccion,
-        contacto: emp.contacto,
-        estadisticas: {
-          totalDepositos: totales.totalDepositos,
-          valorTotal: totales.valorTotal,
-          alertasActivas: alertasCount
-        },
+        coordenadas: coordenadasTransformadas,
+        ciudad: emp.direccion?.ciudad,
+        provincia: emp.direccion?.provincia,
+        depositosActivos: totales.totalDepositos,
+        valorTotal: totales.valorTotal,
+        diasMinimosRestantes,
+        estado,
         depositos: depositos.map(d => ({
           _id: d._id,
           numeroDeposito: d.numeroDeposito,

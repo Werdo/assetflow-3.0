@@ -1,13 +1,13 @@
 /**
- * AssetFlow 3.0 - Simplified Map View Component (BULLETPROOF VERSION)
- * Versión simplificada del mapa con manejo de errores extensivo
- * FASE 1: Comenzamos con contenido básico sin Leaflet
+ * AssetFlow 3.0 - Simplified Map View Component with Advanced Filtering
+ * Vista de tabla con sistema completo de filtrado y paginación
  */
 
-import React from 'react';
-import { Card, Spinner, Alert, Button, Table } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
+import { Card, Spinner, Alert, Button, Table, Form, Row, Col, InputGroup, Badge } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
-import type { EmplazamientoMapData } from '../../types';
+import clienteService from '../../services/clienteService';
+import type { EmplazamientoMapData, Cliente } from '../../types';
 
 interface SimplifiedMapViewProps {
   emplazamientos: EmplazamientoMapData[];
@@ -16,63 +16,7 @@ interface SimplifiedMapViewProps {
 }
 
 /**
- * Formatea un número como moneda europea con manejo de errores
- */
-const formatCurrency = (value: number | undefined | null): string => {
-  try {
-    const safeValue = value ?? 0;
-    if (typeof safeValue !== 'number' || isNaN(safeValue)) {
-      return '€0,00';
-    }
-    return new Intl.NumberFormat('es-ES', {
-      style: 'currency',
-      currency: 'EUR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(safeValue);
-  } catch (error) {
-    console.error('[SimplifiedMapView] Error formatting currency:', error);
-    return '€0,00';
-  }
-};
-
-/**
- * Obtiene el color del badge según el estado
- */
-const getEstadoBadgeColor = (estado: string | undefined): string => {
-  switch (estado) {
-    case 'verde':
-      return 'success';
-    case 'amarillo':
-      return 'warning';
-    case 'rojo':
-    case 'critico':
-      return 'danger';
-    default:
-      return 'secondary';
-  }
-};
-
-/**
- * Obtiene el icono según el estado
- */
-const getEstadoIcon = (estado: string | undefined): string => {
-  switch (estado) {
-    case 'verde':
-      return 'check-circle-fill';
-    case 'amarillo':
-      return 'exclamation-triangle-fill';
-    case 'rojo':
-    case 'critico':
-      return 'x-circle-fill';
-    default:
-      return 'circle-fill';
-  }
-};
-
-/**
- * Componente SimplifiedMapView - Versión simple del mapa
- * TODO: Agregar Leaflet una vez que el componente básico funcione
+ * Componente SimplifiedMapView - Vista de tabla con filtrado avanzado
  */
 export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
   emplazamientos,
@@ -80,24 +24,146 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
   error = null
 }) => {
   const navigate = useNavigate();
+  const [clientes, setClientes] = useState<Cliente[]>([]);
 
-  console.log('[SimplifiedMapView] Render state:', {
-    loading,
-    error,
-    emplazamientosCount: emplazamientos?.length ?? 0
+  // Filtros
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterEstado, setFilterEstado] = useState<string>('all');
+  const [filterCliente, setFilterCliente] = useState<string>('all');
+  const [filterSubcliente, setFilterSubcliente] = useState<string>('all');
+  const [filterValorMin, setFilterValorMin] = useState<string>('');
+  const [filterValorMax, setFilterValorMax] = useState<string>('');
+  const [filterDepositosMin, setFilterDepositosMin] = useState<string>('');
+  const [filterDepositosMax, setFilterDepositosMax] = useState<string>('');
+  const [filterDiasMin, setFilterDiasMin] = useState<string>('');
+
+  // Ordenamiento
+  const [sortBy, setSortBy] = useState<string>('nombre');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Paginación
+  const [itemsPerPage, setItemsPerPage] = useState<number>(50);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  // Cargar clientes al montar
+  useEffect(() => {
+    const cargarClientes = async () => {
+      try {
+        const response = await clienteService.getAll({ limit: 1000 });
+        setClientes(response.clientes);
+      } catch (error) {
+        console.error('Error cargando clientes:', error);
+      }
+    };
+    cargarClientes();
+  }, []);
+
+  // Helper para ordenar
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+    setCurrentPage(1);
+  };
+
+  // Obtener subclientes disponibles
+  const subclientes = clientes.filter(c => c.esSubcliente);
+
+  // Filtrado
+  const emplazamientosFiltrados = emplazamientos.filter((e) => {
+    // Búsqueda por texto
+    const matchesSearch = searchTerm === '' ||
+                         e.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         e.ciudad?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Filtro por estado - convertir estados del dashboard a formato comparable
+    const estado = e.estado?.toLowerCase() || 'verde';
+    const matchesEstado = filterEstado === 'all' ||
+                         (filterEstado === 'activo' && (estado === 'verde' || estado === 'normal')) ||
+                         (filterEstado === 'inactivo' && (estado === 'rojo' || estado === 'critico' || estado === 'amarillo'));
+
+    // Filtro por cliente
+    const clienteId = typeof e.cliente === 'string' ? e.cliente : e.cliente?._id;
+    const matchesCliente = filterCliente === 'all' || clienteId === filterCliente;
+
+    // Filtro por subcliente
+    const subclienteId = (e as any).subcliente ? (typeof (e as any).subcliente === 'string' ? (e as any).subcliente : (e as any).subcliente._id) : null;
+    const matchesSubcliente = filterSubcliente === 'all' || subclienteId === filterSubcliente;
+
+    // Filtro por valor total
+    const valor = e.valorTotal || 0;
+    const matchesValorMin = filterValorMin === '' || valor >= parseFloat(filterValorMin);
+    const matchesValorMax = filterValorMax === '' || valor <= parseFloat(filterValorMax);
+
+    // Filtro por depósitos activos
+    const depositos = e.depositosActivos || 0;
+    const matchesDepositosMin = filterDepositosMin === '' || depositos >= parseInt(filterDepositosMin);
+    const matchesDepositosMax = filterDepositosMax === '' || depositos <= parseInt(filterDepositosMax);
+
+    // Filtro por días mínimos
+    const diasMin = (e as any).diasMinimosRestantes;
+    const matchesDiasMin = filterDiasMin === '' || (diasMin !== null && diasMin !== undefined && diasMin >= parseInt(filterDiasMin));
+
+    return matchesSearch && matchesEstado && matchesCliente && matchesSubcliente &&
+           matchesValorMin && matchesValorMax && matchesDepositosMin && matchesDepositosMax && matchesDiasMin;
   });
 
+  // Ordenamiento
+  const emplazamientosOrdenados = [...emplazamientosFiltrados].sort((a, b) => {
+    let aVal: any;
+    let bVal: any;
+
+    switch (sortBy) {
+      case 'nombre':
+        aVal = a.nombre || '';
+        bVal = b.nombre || '';
+        break;
+      case 'ciudad':
+        aVal = a.ciudad || '';
+        bVal = b.ciudad || '';
+        break;
+      case 'valorTotal':
+        aVal = a.valorTotal || 0;
+        bVal = b.valorTotal || 0;
+        break;
+      case 'depositosActivos':
+        aVal = a.depositosActivos || 0;
+        bVal = b.depositosActivos || 0;
+        break;
+      case 'diasMinimo':
+        aVal = (a as any).diasMinimosRestantes === null || (a as any).diasMinimosRestantes === undefined ? Infinity : (a as any).diasMinimosRestantes;
+        bVal = (b as any).diasMinimosRestantes === null || (b as any).diasMinimosRestantes === undefined ? Infinity : (b as any).diasMinimosRestantes;
+        break;
+      default:
+        aVal = a.nombre || '';
+        bVal = b.nombre || '';
+        break;
+    }
+
+    if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Paginación
+  const totalPages = itemsPerPage === -1 ? 1 : Math.ceil(emplazamientosOrdenados.length / itemsPerPage);
+  const startIndex = itemsPerPage === -1 ? 0 : (currentPage - 1) * itemsPerPage;
+  const endIndex = itemsPerPage === -1 ? emplazamientosOrdenados.length : startIndex + itemsPerPage;
+  const emplazamientosPaginados = emplazamientosOrdenados.slice(startIndex, endIndex);
+
   if (loading) {
-    console.log('[SimplifiedMapView] Rendering loading state');
     return (
       <Card className="h-100">
         <Card.Header className="bg-white border-bottom">
-          <h5 className="mb-0">Mapa de Emplazamientos</h5>
+          <h5 className="mb-0">Vista de Emplazamientos</h5>
         </Card.Header>
         <Card.Body className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
           <div className="text-center">
             <Spinner animation="border" variant="primary" />
-            <p className="mt-3 text-muted">Cargando mapa...</p>
+            <p className="mt-3 text-muted">Cargando datos...</p>
           </div>
         </Card.Body>
       </Card>
@@ -105,15 +171,14 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
   }
 
   if (error) {
-    console.log('[SimplifiedMapView] Rendering error state:', error);
     return (
       <Card className="h-100">
         <Card.Header className="bg-white border-bottom">
-          <h5 className="mb-0">Mapa de Emplazamientos</h5>
+          <h5 className="mb-0">Vista de Emplazamientos</h5>
         </Card.Header>
         <Card.Body>
           <Alert variant="danger">
-            <Alert.Heading>Error al cargar el mapa</Alert.Heading>
+            <Alert.Heading>Error al cargar datos</Alert.Heading>
             <p>{error}</p>
           </Alert>
         </Card.Body>
@@ -121,192 +186,242 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
     );
   }
 
-  if (!emplazamientos || emplazamientos.length === 0) {
-    console.log('[SimplifiedMapView] No emplazamientos to display');
-    return (
-      <Card className="h-100">
-        <Card.Header className="bg-white border-bottom">
-          <h5 className="mb-0">Mapa de Emplazamientos</h5>
-        </Card.Header>
-        <Card.Body className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
-          <div className="text-center">
-            <i className="bi bi-geo-alt" style={{ fontSize: '4rem', color: '#6c757d' }}></i>
-            <h5 className="mt-3 text-muted">No hay emplazamientos para mostrar</h5>
-            <p className="text-muted">Crea tu primer emplazamiento para verlo en el mapa</p>
-            <Button variant="primary" onClick={() => navigate('/emplazamientos/nuevo')}>
-              Crear Emplazamiento
-            </Button>
-          </div>
-        </Card.Body>
-      </Card>
-    );
-  }
-
-  console.log('[SimplifiedMapView] Rendering', emplazamientos.length, 'emplazamientos');
-
   return (
     <Card className="h-100">
       <Card.Header className="bg-white border-bottom">
         <div className="d-flex justify-content-between align-items-center">
-          <h5 className="mb-0">Vista de Emplazamientos ({emplazamientos.length})</h5>
-          <div className="d-flex gap-3">
-            <div className="d-flex align-items-center gap-1">
-              <span
-                style={{
-                  width: '12px',
-                  height: '12px',
-                  backgroundColor: '#28a745',
-                  borderRadius: '50%',
-                  display: 'inline-block',
-                }}
-              ></span>
-              <small className="text-muted">Normal</small>
-            </div>
-            <div className="d-flex align-items-center gap-1">
-              <span
-                style={{
-                  width: '12px',
-                  height: '12px',
-                  backgroundColor: '#ffc107',
-                  borderRadius: '50%',
-                  display: 'inline-block',
-                }}
-              ></span>
-              <small className="text-muted">Advertencia</small>
-            </div>
-            <div className="d-flex align-items-center gap-1">
-              <span
-                style={{
-                  width: '12px',
-                  height: '12px',
-                  backgroundColor: '#dc3545',
-                  borderRadius: '50%',
-                  display: 'inline-block',
-                }}
-              ></span>
-              <small className="text-muted">Crítico</small>
-            </div>
+          <div>
+            <h5 className="mb-0">Vista de Emplazamientos</h5>
+            <small className="text-muted">{emplazamientos.length} emplazamientos totales</small>
           </div>
         </div>
       </Card.Header>
-      <Card.Body className="p-0">
-        <div className="alert alert-info m-3">
-          <i className="bi bi-info-circle me-2"></i>
-          <strong>Mapa simplificado:</strong> Por ahora mostramos una lista. El mapa interactivo se activará una vez verificado que todo funciona correctamente.
-        </div>
-        <div className="table-responsive">
-          <Table hover className="mb-0">
-            <thead className="table-light">
-              <tr>
-                <th style={{ width: '40px' }}></th>
-                <th>Emplazamiento</th>
-                <th>Cliente</th>
-                <th>Ubicación</th>
-                <th className="text-center">Depósitos</th>
-                <th className="text-end">Valor Total</th>
-                <th className="text-center">Días Min.</th>
-                <th className="text-center">Estado</th>
-                <th className="text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {emplazamientos.map((emp) => {
-                const safeEmp = {
-                  _id: emp?._id || 'unknown',
-                  nombre: emp?.nombre || 'Sin nombre',
-                  cliente: emp?.cliente?.nombre || 'Sin cliente',
-                  ciudad: emp?.ciudad || '',
-                  provincia: emp?.provincia || '',
-                  depositosActivos: emp?.depositosActivos ?? 0,
-                  valorTotal: emp?.valorTotal ?? 0,
-                  diasMinimosRestantes: emp?.diasMinimosRestantes,
-                  estado: emp?.estado || 'verde',
-                  coordenadas: emp?.coordenadas || { lat: 0, lng: 0 }
-                };
+      <Card.Body className="p-3">
+        {/* Filtros Row 1 */}
+        <Row className="mb-2">
+          <Col md={4}>
+            <InputGroup size="sm">
+              <InputGroup.Text><i className="bi bi-search"></i></InputGroup.Text>
+              <Form.Control
+                placeholder="Buscar por nombre o ciudad..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              />
+            </InputGroup>
+          </Col>
+          <Col md={2}>
+            <Form.Select size="sm" value={filterCliente} onChange={(e) => { setFilterCliente(e.target.value); setCurrentPage(1); }}>
+              <option value="all">Todos los clientes</option>
+              {clientes.filter(c => !c.esSubcliente).map(cliente => (
+                <option key={cliente._id} value={cliente._id}>{cliente.nombre}</option>
+              ))}
+            </Form.Select>
+          </Col>
+          <Col md={2}>
+            <Form.Select size="sm" value={filterSubcliente} onChange={(e) => { setFilterSubcliente(e.target.value); setCurrentPage(1); }}>
+              <option value="all">Todos los subclientes</option>
+              {subclientes.map(subcliente => (
+                <option key={subcliente._id} value={subcliente._id}>{subcliente.nombre}</option>
+              ))}
+            </Form.Select>
+          </Col>
+          <Col md={2}>
+            <Form.Select size="sm" value={filterEstado} onChange={(e) => { setFilterEstado(e.target.value); setCurrentPage(1); }}>
+              <option value="all">Todos los estados</option>
+              <option value="activo">Normal</option>
+              <option value="inactivo">Advertencia/Crítico</option>
+            </Form.Select>
+          </Col>
+          <Col md={2}>
+            <Form.Select size="sm" value={itemsPerPage} onChange={(e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); }}>
+              <option value="50">50 por página</option>
+              <option value="100">100 por página</option>
+              <option value="200">200 por página</option>
+              <option value="-1">Todos</option>
+            </Form.Select>
+          </Col>
+        </Row>
 
-                console.log('[SimplifiedMapView] Rendering emplazamiento:', safeEmp._id);
+        {/* Filtros Row 2 - Rangos numéricos */}
+        <Row className="mb-3">
+          <Col md={2}>
+            <Form.Control
+              type="number"
+              size="sm"
+              placeholder="Valor mín €"
+              value={filterValorMin}
+              onChange={(e) => { setFilterValorMin(e.target.value); setCurrentPage(1); }}
+            />
+          </Col>
+          <Col md={2}>
+            <Form.Control
+              type="number"
+              size="sm"
+              placeholder="Valor máx €"
+              value={filterValorMax}
+              onChange={(e) => { setFilterValorMax(e.target.value); setCurrentPage(1); }}
+            />
+          </Col>
+          <Col md={2}>
+            <Form.Control
+              type="number"
+              size="sm"
+              placeholder="Depósitos mín"
+              value={filterDepositosMin}
+              onChange={(e) => { setFilterDepositosMin(e.target.value); setCurrentPage(1); }}
+            />
+          </Col>
+          <Col md={2}>
+            <Form.Control
+              type="number"
+              size="sm"
+              placeholder="Depósitos máx"
+              value={filterDepositosMax}
+              onChange={(e) => { setFilterDepositosMax(e.target.value); setCurrentPage(1); }}
+            />
+          </Col>
+          <Col md={2}>
+            <Form.Control
+              type="number"
+              size="sm"
+              placeholder="Días mín venc."
+              value={filterDiasMin}
+              onChange={(e) => { setFilterDiasMin(e.target.value); setCurrentPage(1); }}
+            />
+          </Col>
+          <Col md={2}>
+            <div className="small text-muted text-center">
+              {emplazamientosOrdenados.length} resultados
+            </div>
+          </Col>
+        </Row>
 
-                return (
-                  <tr key={safeEmp._id}>
-                    <td className="text-center align-middle">
-                      <i
-                        className={`bi bi-${getEstadoIcon(safeEmp.estado)}`}
-                        style={{
-                          fontSize: '1.25rem',
-                          color: safeEmp.estado === 'verde' ? '#28a745' :
-                                 safeEmp.estado === 'amarillo' ? '#ffc107' : '#dc3545'
-                        }}
-                      ></i>
-                    </td>
-                    <td className="align-middle">
-                      <strong>{safeEmp.nombre}</strong>
-                    </td>
-                    <td className="align-middle">
-                      {(emp as any)?.subcliente ? (
-                        <div>
-                          <div><strong>{(emp as any).subcliente.clientePrincipal?.nombre || safeEmp.cliente}</strong></div>
-                          <small className="text-muted">└ {(emp as any).subcliente.nombre}</small>
-                        </div>
-                      ) : (
-                        safeEmp.cliente
-                      )}
-                    </td>
-                    <td className="align-middle">
-                      {safeEmp.ciudad}
-                      {safeEmp.provincia && `, ${safeEmp.provincia}`}
-                    </td>
-                    <td className="text-center align-middle">
-                      <span className="badge bg-primary">{safeEmp.depositosActivos}</span>
-                    </td>
-                    <td className="text-end align-middle">
-                      <strong className="text-success">{formatCurrency(safeEmp.valorTotal)}</strong>
-                    </td>
-                    <td className="text-center align-middle">
-                      {safeEmp.diasMinimosRestantes !== undefined ? (
-                        <span
-                          className={
-                            safeEmp.diasMinimosRestantes < 7 ? 'text-danger fw-bold' :
-                            safeEmp.diasMinimosRestantes < 30 ? 'text-warning fw-bold' :
-                            'text-success'
-                          }
+        {emplazamientosOrdenados.length === 0 ? (
+          <Alert variant="info">
+            No se encontraron emplazamientos con los filtros aplicados.
+          </Alert>
+        ) : (
+          <div className="table-responsive">
+            <Table hover className="mb-0" size="sm">
+              <thead className="table-light">
+                <tr>
+                  <th onClick={() => handleSort('nombre')} style={{ cursor: 'pointer' }}>
+                    Nombre {sortBy === 'nombre' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th>Cliente / Subcliente</th>
+                  <th onClick={() => handleSort('ciudad')} style={{ cursor: 'pointer' }}>
+                    Ciudad {sortBy === 'ciudad' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('valorTotal')} style={{ cursor: 'pointer' }} className="text-end">
+                    Valor Total {sortBy === 'valorTotal' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('depositosActivos')} style={{ cursor: 'pointer' }} className="text-center">
+                    Depósitos {sortBy === 'depositosActivos' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('diasMinimo')} style={{ cursor: 'pointer' }} className="text-center">
+                    Días Mín {sortBy === 'diasMinimo' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th className="text-center">Estado</th>
+                  <th className="text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {emplazamientosPaginados.map((emp) => {
+                  const diasMin = (emp as any).diasMinimosRestantes;
+                  const estado = emp.estado?.toLowerCase() || 'verde';
+
+                  return (
+                    <tr key={emp._id}>
+                      <td><strong>{emp.nombre}</strong></td>
+                      <td>
+                        {(emp as any).subcliente ? (
+                          <div>
+                            <div><strong className="small">{(emp as any).subcliente.clientePrincipal?.nombre || emp.cliente?.nombre}</strong></div>
+                            <small className="text-muted">└ {(emp as any).subcliente.nombre}</small>
+                          </div>
+                        ) : (
+                          <span className="small">{emp.cliente?.nombre || 'N/A'}</span>
+                        )}
+                      </td>
+                      <td className="small">{emp.ciudad || '-'}{emp.provincia ? `, ${emp.provincia}` : ''}</td>
+                      <td className="text-end">
+                        <strong className="text-success">
+                          €{(emp.valorTotal || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                        </strong>
+                      </td>
+                      <td className="text-center">
+                        <Badge bg="info">{emp.depositosActivos || 0}</Badge>
+                      </td>
+                      <td className="text-center">
+                        {diasMin !== null && diasMin !== undefined ? (
+                          <Badge bg={
+                            diasMin < 7 ? 'danger' :
+                            diasMin < 30 ? 'warning' :
+                            'success'
+                          }>
+                            {diasMin} días
+                          </Badge>
+                        ) : (
+                          <span className="text-muted small">N/A</span>
+                        )}
+                      </td>
+                      <td className="text-center">
+                        <Badge bg={
+                          estado === 'verde' || estado === 'normal' ? 'success' :
+                          estado === 'amarillo' || estado === 'warning' ? 'warning' :
+                          'danger'
+                        } className="small">
+                          {estado === 'verde' || estado === 'normal' ? 'Normal' :
+                           estado === 'amarillo' || estado === 'warning' ? 'Advertencia' :
+                           'Crítico'}
+                        </Badge>
+                      </td>
+                      <td className="text-center">
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => navigate(`/emplazamientos/${emp._id}`)}
                         >
-                          {safeEmp.diasMinimosRestantes} días
-                        </span>
-                      ) : (
-                        <span className="text-muted">-</span>
-                      )}
-                    </td>
-                    <td className="text-center align-middle">
-                      <span className={`badge bg-${getEstadoBadgeColor(safeEmp.estado)}`}>
-                        {safeEmp.estado}
-                      </span>
-                    </td>
-                    <td className="text-center align-middle">
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={() => navigate(`/emplazamientos/${safeEmp._id}`)}
-                      >
-                        <i className="bi bi-eye"></i>
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-        </div>
+                          <i className="bi bi-eye"></i>
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          </div>
+        )}
       </Card.Body>
-      <Card.Footer className="bg-light text-muted small">
-        <div className="d-flex justify-content-between align-items-center">
-          <span>Total: {emplazamientos.length} emplazamientos</span>
-          <Button
-            variant="link"
-            size="sm"
-            onClick={() => navigate('/emplazamientos')}
-          >
-            Ver todos los emplazamientos
-          </Button>
+      <Card.Footer className="bg-light">
+        <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <small className="text-muted">
+            Mostrando {itemsPerPage === -1 ? emplazamientosOrdenados.length : Math.min(startIndex + 1, emplazamientosOrdenados.length)} - {itemsPerPage === -1 ? emplazamientosOrdenados.length : Math.min(endIndex, emplazamientosOrdenados.length)} de {emplazamientosOrdenados.length} emplazamiento{emplazamientosOrdenados.length !== 1 ? 's' : ''}
+            {emplazamientosOrdenados.length !== emplazamientos.length && ` (${emplazamientos.length} total)`}
+          </small>
+          {itemsPerPage !== -1 && totalPages > 1 && (
+            <div className="d-flex gap-2 align-items-center">
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+              >
+                <i className="bi bi-chevron-left"></i>
+              </Button>
+              <small className="text-muted">
+                Página {currentPage} de {totalPages}
+              </small>
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+              >
+                <i className="bi bi-chevron-right"></i>
+              </Button>
+            </div>
+          )}
         </div>
       </Card.Footer>
     </Card>
