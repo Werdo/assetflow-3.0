@@ -4,9 +4,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Alert, Button } from 'react-bootstrap';
+import { Container, Row, Col, Alert, Button, ButtonGroup } from 'react-bootstrap';
 import toast from 'react-hot-toast';
 import { SimplifiedMapView } from '../../components/dashboard/SimplifiedMapView';
+import { RobustMapView } from '../../components/dashboard/RobustMapView';
 import { SimplifiedKPICards } from '../../components/dashboard/SimplifiedKPICards';
 import { SimplifiedAlertas } from '../../components/dashboard/SimplifiedAlertas';
 import { dashboardService } from '../../services/dashboardService';
@@ -31,8 +32,11 @@ export const DashboardPage: React.FC = () => {
   const [errorMap, setErrorMap] = useState<string | null>(null);
   const [errorAlertas, setErrorAlertas] = useState<string | null>(null);
 
+  // Toggle entre mapa y tabla
+  const [viewMode, setViewMode] = useState<'map' | 'table'>('map');
+
   /**
-   * Carga los KPIs del dashboard con manejo de errores extensivo
+   * Carga los KPIs del dashboard con manejo de errores extensivos
    */
   const cargarKPIs = async () => {
     console.log('[DashboardPage] cargarKPIs - STARTED');
@@ -262,14 +266,43 @@ export const DashboardPage: React.FC = () => {
       {/* KPIs Cards */}
       <SimplifiedKPICards kpis={kpis} loading={loadingKPIs} error={errorKPIs} />
 
-      {/* Mapa de Emplazamientos */}
+      {/* Mapa de Emplazamientos con Toggle */}
       <Row className="mb-4">
         <Col xs={12}>
-          <SimplifiedMapView
-            emplazamientos={emplazamientos}
-            loading={loadingMap}
-            error={errorMap}
-          />
+          <div className="mb-3 d-flex justify-content-end gap-2">
+            <ButtonGroup>
+              <Button
+                variant={viewMode === 'map' ? 'primary' : 'outline-primary'}
+                onClick={() => setViewMode('map')}
+                size="sm"
+              >
+                <i className="bi bi-map me-1"></i>
+                Mapa
+              </Button>
+              <Button
+                variant={viewMode === 'table' ? 'primary' : 'outline-primary'}
+                onClick={() => setViewMode('table')}
+                size="sm"
+              >
+                <i className="bi bi-table me-1"></i>
+                Tabla
+              </Button>
+            </ButtonGroup>
+          </div>
+
+          {viewMode === 'map' ? (
+            <RobustMapView
+              emplazamientos={emplazamientos}
+              loading={loadingMap}
+              error={errorMap}
+            />
+          ) : (
+            <SimplifiedMapView
+              emplazamientos={emplazamientos}
+              loading={loadingMap}
+              error={errorMap}
+            />
+          )}
         </Col>
       </Row>
 
