@@ -534,7 +534,7 @@ const DepositosPage = () => {
       setSelectedDeposito(resultado.deposito);
 
       if (resultado.conflictos.length > 0) {
-        toast.warning(`Se importaron ${resultado.codigosNuevos} códigos. ${resultado.conflictos.length} códigos duplicados fueron omitidos.`);
+        toast(`Se importaron ${resultado.codigosNuevos} códigos. ${resultado.conflictos.length} códigos duplicados fueron omitidos.`, { icon: '⚠️' });
       } else {
         toast.success(`Se importaron ${resultado.codigosNuevos} códigos correctamente`);
       }

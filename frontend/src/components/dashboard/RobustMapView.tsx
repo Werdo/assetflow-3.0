@@ -75,7 +75,7 @@ export const RobustMapView: React.FC<RobustMapViewProps> = ({
         }
 
         // Crear mapa
-        const map = L.map(mapContainerRef.current, {
+        const map = L.map(mapContainerRef.current!, {
           center: [40.4168, -3.7038], // Madrid por defecto
           zoom: 6,
           scrollWheelZoom: true,

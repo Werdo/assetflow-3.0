@@ -103,10 +103,10 @@ export const ClientesPage = () => {
       const { codigo, ...dataToSend } = formData;
 
       if (editingCliente) {
-        await clienteService.update(editingCliente._id, dataToSend);
+        await clienteService.update(editingCliente._id, dataToSend as any);
         toast.success('Cliente actualizado correctamente');
       } else {
-        await clienteService.create(dataToSend);
+        await clienteService.create(dataToSend as any);
         toast.success('Cliente creado correctamente');
       }
       handleCloseModal();
