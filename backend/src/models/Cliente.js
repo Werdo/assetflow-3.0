@@ -73,8 +73,8 @@ clienteSchema.pre('save', async function(next) {
       this.clientePrincipal = null;
     }
 
-    // Only generate codigo if it's a new document and codigo is not provided
-    if (this.isNew && !this.codigo) {
+    // ALWAYS generate codigo for new documents (ignore any provided codigo)
+    if (this.isNew) {
       const Cliente = this.constructor;
 
       if (this.esSubcliente) {

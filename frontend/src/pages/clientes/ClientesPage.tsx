@@ -99,11 +99,14 @@ export const ClientesPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Excluir el código del envío (se genera automáticamente en el backend)
+      const { codigo, ...dataToSend } = formData;
+
       if (editingCliente) {
-        await clienteService.update(editingCliente._id, formData);
+        await clienteService.update(editingCliente._id, dataToSend);
         toast.success('Cliente actualizado correctamente');
       } else {
-        await clienteService.create(formData);
+        await clienteService.create(dataToSend);
         toast.success('Cliente creado correctamente');
       }
       handleCloseModal();
@@ -277,14 +280,21 @@ export const ClientesPage = () => {
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Código *</Form.Label>
+                  <Form.Label>
+                    Código {editingCliente && <span className="text-muted">(Generado automáticamente)</span>}
+                  </Form.Label>
                   <Form.Control
                     type="text"
-                    value={formData.codigo}
-                    onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                    required
-                    disabled={!!editingCliente}
+                    value={editingCliente ? formData.codigo : (formData.esSubcliente ? 'SUB-CLI-XXXXX (Auto)' : 'CLI-XXXXX (Auto)')}
+                    readOnly
+                    disabled
+                    className="bg-light"
                   />
+                  {!editingCliente && (
+                    <Form.Text className="text-muted">
+                      El código se generará automáticamente al crear el cliente
+                    </Form.Text>
+                  )}
                 </Form.Group>
               </Col>
               <Col md={6}>
