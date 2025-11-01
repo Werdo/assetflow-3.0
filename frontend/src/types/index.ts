@@ -167,7 +167,7 @@ export interface Emplazamiento {
 }
 
 export interface EmplazamientoFormData {
-  codigo: string;
+  codigo?: string; // Opcional - se genera automáticamente en el backend
   nombre: string;
   cliente: string;
 

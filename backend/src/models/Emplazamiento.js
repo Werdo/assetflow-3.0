@@ -72,17 +72,16 @@ const emplazamientoSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Pre-save hook: Auto-generate codigo if not provided (EMP-2025-XXXXXX format)
+// Pre-save hook: Auto-generate codigo (EMP-OMN-XXXXXXX format)
 emplazamientoSchema.pre('save', async function(next) {
   try {
-    // Only generate codigo if it's a new document and codigo is not provided
-    if (this.isNew && !this.codigo) {
+    // ALWAYS generate codigo for new documents (ignore any provided codigo)
+    if (this.isNew) {
       const Emplazamiento = this.constructor;
-      const currentYear = new Date().getFullYear();
-      const prefix = `EMP-${currentYear}-`;
+      const prefix = 'EMP-OMN-';
 
-      // Find the latest emplazamiento with codigo for current year
-      const lastEmplazamiento = await Emplazamiento.findOne({ codigo: new RegExp(`^${prefix}`) })
+      // Find the latest emplazamiento with codigo
+      const lastEmplazamiento = await Emplazamiento.findOne({ codigo: /^EMP-OMN-/ })
         .sort({ codigo: -1 })
         .limit(1)
         .select('codigo')
@@ -90,15 +89,15 @@ emplazamientoSchema.pre('save', async function(next) {
 
       let nextNumber = 1;
       if (lastEmplazamiento && lastEmplazamiento.codigo) {
-        // Extract number from codigo (EMP-2025-000001 -> 000001 -> 1)
-        const match = lastEmplazamiento.codigo.match(/^EMP-\d{4}-(\d+)$/);
+        // Extract number from codigo (EMP-OMN-0000001 -> 0000001 -> 1)
+        const match = lastEmplazamiento.codigo.match(/^EMP-OMN-(\d+)$/);
         if (match) {
           nextNumber = parseInt(match[1], 10) + 1;
         }
       }
 
-      // Generate new codigo with 6-digit zero-padded number
-      this.codigo = `${prefix}${String(nextNumber).padStart(6, '0')}`;
+      // Generate new codigo with 7-digit zero-padded number
+      this.codigo = `${prefix}${String(nextNumber).padStart(7, '0')}`;
     }
 
     next();

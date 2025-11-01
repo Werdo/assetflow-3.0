@@ -215,7 +215,9 @@ export const EmplazamientosPage = () => {
         await emplazamientoService.update(editingEmplazamiento._id, formData);
         toast.success('Emplazamiento actualizado correctamente');
       } else {
-        await emplazamientoService.create(formData);
+        // No enviar código al crear - se genera automáticamente en el backend
+        const { codigo, ...dataToSend } = formData;
+        await emplazamientoService.create(dataToSend);
         toast.success('Emplazamiento creado correctamente');
       }
       handleCloseModal();
@@ -663,20 +665,24 @@ export const EmplazamientosPage = () => {
                 {/* Información Básica */}
                 <h6 className="fw-bold mb-3">Información Básica</h6>
                 <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Código *</Form.Label>
-                      <Form.Control
-                        type="text"
-                        value={formData.codigo}
-                        onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                        required
-                        disabled={!!editingEmplazamiento}
-                        placeholder="EMP-2025-001"
-                      />
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
+                  {editingEmplazamiento && (
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Código</Form.Label>
+                        <Form.Control
+                          type="text"
+                          value={formData.codigo}
+                          disabled
+                          placeholder="EMP-OMN-0000001"
+                          readOnly
+                        />
+                        <Form.Text className="text-muted">
+                          Generado automáticamente
+                        </Form.Text>
+                      </Form.Group>
+                    </Col>
+                  )}
+                  <Col md={editingEmplazamiento ? 6 : 12}>
                     <Form.Group className="mb-3">
                       <Form.Label>Nombre *</Form.Label>
                       <Form.Control
