@@ -27,4 +27,8 @@ router.get('/terminal/commands', terminalController.getAllowedCommands);
 router.get('/terminal/system-info', terminalController.getSystemInfo);
 router.get('/terminal/history', terminalController.getCommandHistory);
 
+// Configuration Routes
+router.get('/terminal/config/:type', terminalController.getConfig);
+router.put('/terminal/config/:type', terminalController.updateConfig);
+
 module.exports = router;

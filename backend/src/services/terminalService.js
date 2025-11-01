@@ -267,6 +267,52 @@ class TerminalService {
   }
 
   /**
+   * Obtiene la configuración de backup o snapshot
+   */
+  async getConfig(type) {
+    try {
+      const configPath = path.join(this.scriptsDir, `${type}.config.json`);
+      const configData = await fs.readFile(configPath, 'utf8');
+      return JSON.parse(configData);
+    } catch (error) {
+      logger.error(`Failed to read ${type} config`, { error: error.message });
+      throw new Error(`No se pudo leer la configuración de ${type}`);
+    }
+  }
+
+  /**
+   * Actualiza la configuración de backup o snapshot
+   */
+  async updateConfig(type, config) {
+    try {
+      // Validar tipo
+      if (!['backup', 'snapshot'].includes(type)) {
+        throw new Error('Tipo de configuración inválido');
+      }
+
+      const configPath = path.join(this.scriptsDir, `${type}.config.json`);
+
+      // Hacer backup del archivo actual
+      const backupPath = `${configPath}.backup`;
+      try {
+        const currentConfig = await fs.readFile(configPath, 'utf8');
+        await fs.writeFile(backupPath, currentConfig, 'utf8');
+      } catch (error) {
+        logger.warn(`Could not create backup of ${type} config`);
+      }
+
+      // Guardar nueva configuración
+      await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
+
+      logger.info(`${type} configuration updated successfully`);
+      return { success: true, message: 'Configuración actualizada correctamente' };
+    } catch (error) {
+      logger.error(`Failed to update ${type} config`, { error: error.message });
+      throw new Error(`No se pudo actualizar la configuración de ${type}: ${error.message}`);
+    }
+  }
+
+  /**
    * Obtiene información del sistema
    */
   async getSystemInfo() {

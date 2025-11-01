@@ -76,4 +76,60 @@ exports.getCommandHistory = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Obtener configuración de backup o snapshot
+ * @route   GET /api/admin/terminal/config/:type
+ * @access  Private (Admin only)
+ */
+exports.getConfig = asyncHandler(async (req, res) => {
+  const { type } = req.params;
+
+  if (!['backup', 'snapshot'].includes(type)) {
+    throw new ValidationError('Tipo de configuración inválido');
+  }
+
+  const config = await terminalService.getConfig(type);
+
+  logger.info(`${type} configuration retrieved`, {
+    userId: req.user.id,
+    userName: req.user.name
+  });
+
+  res.status(200).json({
+    success: true,
+    data: config
+  });
+});
+
+/**
+ * @desc    Actualizar configuración de backup o snapshot
+ * @route   PUT /api/admin/terminal/config/:type
+ * @access  Private (Admin only)
+ */
+exports.updateConfig = asyncHandler(async (req, res) => {
+  const { type } = req.params;
+  const config = req.body;
+
+  if (!['backup', 'snapshot'].includes(type)) {
+    throw new ValidationError('Tipo de configuración inválido');
+  }
+
+  if (!config || typeof config !== 'object') {
+    throw new ValidationError('Configuración inválida');
+  }
+
+  const result = await terminalService.updateConfig(type, config);
+
+  logger.info(`${type} configuration updated`, {
+    userId: req.user.id,
+    userName: req.user.name,
+    config
+  });
+
+  res.status(200).json({
+    success: true,
+    data: result
+  });
+});
+
 module.exports = exports;

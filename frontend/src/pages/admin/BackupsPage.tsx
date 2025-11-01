@@ -4,19 +4,59 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Alert, Table, Badge, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Alert, Table, Badge, Spinner, Modal, Form } from 'react-bootstrap';
 import toast from 'react-hot-toast';
 import terminalService from '../../services/terminalService';
+
+interface BackupConfig {
+  enabled: boolean;
+  schedule: string;
+  retention: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+  };
+  mongodb: {
+    enabled: boolean;
+    host: string;
+    port: number;
+    database: string;
+  };
+  files: {
+    enabled: boolean;
+    paths: string[];
+  };
+  compression: {
+    enabled: boolean;
+    format: string;
+  };
+}
 
 export const BackupsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [backupsList, setBackupsList] = useState<any[]>([]);
   const [backupStatus, setBackupStatus] = useState<string>('');
   const [executing, setExecuting] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [config, setConfig] = useState<BackupConfig | null>(null);
+  const [editedConfig, setEditedConfig] = useState<BackupConfig | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadBackupsInfo();
+    loadConfig();
   }, []);
+
+  const loadConfig = async () => {
+    try {
+      const cfg = await terminalService.getConfig('backup');
+      setConfig(cfg);
+      setEditedConfig(cfg);
+    } catch (error: any) {
+      console.error('Error loading backup config:', error);
+      toast.error('Error al cargar configuración');
+    }
+  };
 
   const loadBackupsInfo = async () => {
     setLoading(true);
@@ -61,6 +101,23 @@ export const BackupsPage: React.FC = () => {
     }
   };
 
+  const handleSaveConfig = async () => {
+    if (!editedConfig) return;
+
+    setSaving(true);
+    try {
+      await terminalService.updateConfig('backup', editedConfig);
+      toast.success('Configuración guardada exitosamente');
+      setConfig(editedConfig);
+      setShowConfigModal(false);
+      loadConfig();
+    } catch (error: any) {
+      toast.error('Error al guardar configuración');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('es-ES');
   };
@@ -81,6 +138,14 @@ export const BackupsPage: React.FC = () => {
               </p>
             </div>
             <div className="d-flex gap-2">
+              <Button
+                variant="outline-secondary"
+                onClick={() => setShowConfigModal(true)}
+                disabled={loading || !config}
+              >
+                <i className="bi bi-gear me-1"></i>
+                Configurar
+              </Button>
               <Button
                 variant="outline-primary"
                 onClick={loadBackupsInfo}
@@ -112,77 +177,83 @@ export const BackupsPage: React.FC = () => {
       </Row>
 
       {/* Configuration Summary */}
-      <Row className="mb-4">
-        <Col lg={6}>
-          <Card className="border-0 shadow-sm h-100">
-            <Card.Header className="bg-primary text-white">
-              <i className="bi bi-gear-fill me-2"></i>
-              Configuración Actual
-            </Card.Header>
-            <Card.Body>
-              <Table size="sm" className="mb-0">
-                <tbody>
-                  <tr>
-                    <td className="fw-semibold">Horario</td>
-                    <td>2:00 AM diariamente</td>
-                  </tr>
-                  <tr>
-                    <td className="fw-semibold">Retención Diaria</td>
-                    <td>7 backups</td>
-                  </tr>
-                  <tr>
-                    <td className="fw-semibold">Retención Semanal</td>
-                    <td>4 backups</td>
-                  </tr>
-                  <tr>
-                    <td className="fw-semibold">Retención Mensual</td>
-                    <td>6 backups</td>
-                  </tr>
-                  <tr>
-                    <td className="fw-semibold">Compresión</td>
-                    <td>
-                      <Badge bg="success">Habilitada (tar.gz)</Badge>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="fw-semibold">Ubicación</td>
-                    <td><code>/var/backups/assetflow</code></td>
-                  </tr>
-                </tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-        </Col>
+      {config && (
+        <Row className="mb-4">
+          <Col lg={6}>
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Header className="bg-primary text-white">
+                <i className="bi bi-gear-fill me-2"></i>
+                Configuración Actual
+              </Card.Header>
+              <Card.Body>
+                <Table size="sm" className="mb-0">
+                  <tbody>
+                    <tr>
+                      <td className="fw-semibold">Estado</td>
+                      <td>
+                        <Badge bg={config.enabled ? 'success' : 'secondary'}>
+                          {config.enabled ? 'Habilitado' : 'Deshabilitado'}
+                        </Badge>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="fw-semibold">Horario</td>
+                      <td>{config.schedule}</td>
+                    </tr>
+                    <tr>
+                      <td className="fw-semibold">Retención Diaria</td>
+                      <td>{config.retention.daily} backups</td>
+                    </tr>
+                    <tr>
+                      <td className="fw-semibold">Retención Semanal</td>
+                      <td>{config.retention.weekly} backups</td>
+                    </tr>
+                    <tr>
+                      <td className="fw-semibold">Retención Mensual</td>
+                      <td>{config.retention.monthly} backups</td>
+                    </tr>
+                    <tr>
+                      <td className="fw-semibold">Compresión</td>
+                      <td>
+                        <Badge bg="success">{config.compression.format}</Badge>
+                      </td>
+                    </tr>
+                  </tbody>
+                </Table>
+              </Card.Body>
+            </Card>
+          </Col>
 
-        <Col lg={6}>
-          <Card className="border-0 shadow-sm h-100">
-            <Card.Header className="bg-info text-white">
-              <i className="bi bi-clipboard-check me-2"></i>
-              Qué se Incluye
-            </Card.Header>
-            <Card.Body>
-              <ul className="mb-0">
-                <li className="mb-2">
-                  <i className="bi bi-check-circle-fill text-success me-2"></i>
-                  <strong>Base de Datos MongoDB:</strong> Todos los datos del sistema
-                </li>
-                <li className="mb-2">
-                  <i className="bi bi-check-circle-fill text-success me-2"></i>
-                  <strong>Archivos de Configuración:</strong> .env, docker-compose.yml
-                </li>
-                <li className="mb-2">
-                  <i className="bi bi-check-circle-fill text-success me-2"></i>
-                  <strong>Rotación Automática:</strong> Daily/Weekly/Monthly
-                </li>
-                <li className="mb-0">
-                  <i className="bi bi-check-circle-fill text-success me-2"></i>
-                  <strong>Logs Detallados:</strong> /var/log/assetflow/backup.log
-                </li>
-              </ul>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+          <Col lg={6}>
+            <Card className="border-0 shadow-sm h-100">
+              <Card.Header className="bg-info text-white">
+                <i className="bi bi-clipboard-check me-2"></i>
+                Qué se Incluye
+              </Card.Header>
+              <Card.Body>
+                <ul className="mb-0">
+                  <li className="mb-2">
+                    <i className={`bi bi-check-circle-fill ${config.mongodb.enabled ? 'text-success' : 'text-secondary'} me-2`}></i>
+                    <strong>Base de Datos MongoDB:</strong> {config.mongodb.database}
+                  </li>
+                  <li className="mb-2">
+                    <i className={`bi bi-check-circle-fill ${config.files.enabled ? 'text-success' : 'text-secondary'} me-2`}></i>
+                    <strong>Archivos de Configuración:</strong> {config.files.paths.length} archivos
+                  </li>
+                  <li className="mb-2">
+                    <i className="bi bi-check-circle-fill text-success me-2"></i>
+                    <strong>Rotación Automática:</strong> Daily/Weekly/Monthly
+                  </li>
+                  <li className="mb-0">
+                    <i className="bi bi-check-circle-fill text-success me-2"></i>
+                    <strong>Logs Detallados:</strong> /var/log/assetflow/backup.log
+                  </li>
+                </ul>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      )}
 
       {/* Backup Status */}
       {backupStatus && (
@@ -270,27 +341,211 @@ export const BackupsPage: React.FC = () => {
         </Col>
       </Row>
 
-      {/* Configuration File Info */}
-      <Row className="mt-4">
-        <Col>
-          <Alert variant="warning">
-            <Alert.Heading>
-              <i className="bi bi-exclamation-triangle me-2"></i>
-              Modificar Configuración
-            </Alert.Heading>
-            <p>
-              Para modificar la configuración de backups, edita el archivo:
-            </p>
-            <code>/var/www/assetflow/scripts/backup.config.json</code>
-            <hr />
-            <p className="mb-0 small">
-              Después de modificar la configuración, reinicia el servicio cron o ejecuta:
-              <br />
-              <code>bash /var/www/assetflow/scripts/install-cron.sh</code>
-            </p>
-          </Alert>
-        </Col>
-      </Row>
+      {/* Configuration Modal */}
+      <Modal show={showConfigModal} onHide={() => setShowConfigModal(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="bi bi-gear-fill me-2"></i>
+            Configuración de Backups
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {editedConfig && (
+            <Form>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Estado del Sistema</Form.Label>
+                    <Form.Check
+                      type="switch"
+                      id="backup-enabled"
+                      label={editedConfig.enabled ? 'Habilitado' : 'Deshabilitado'}
+                      checked={editedConfig.enabled}
+                      onChange={(e) => setEditedConfig({
+                        ...editedConfig,
+                        enabled: e.target.checked
+                      })}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Horario (cron)</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={editedConfig.schedule}
+                      onChange={(e) => setEditedConfig({
+                        ...editedConfig,
+                        schedule: e.target.value
+                      })}
+                      placeholder="0 2 * * *"
+                    />
+                    <Form.Text className="text-muted">
+                      Formato cron: minuto hora día mes día-semana
+                    </Form.Text>
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <hr />
+
+              <h6 className="mb-3">Retención de Backups</h6>
+              <Row>
+                <Col md={4}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Backups Diarios</Form.Label>
+                    <Form.Control
+                      type="number"
+                      min="1"
+                      value={editedConfig.retention.daily}
+                      onChange={(e) => setEditedConfig({
+                        ...editedConfig,
+                        retention: {
+                          ...editedConfig.retention,
+                          daily: parseInt(e.target.value) || 7
+                        }
+                      })}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={4}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Backups Semanales</Form.Label>
+                    <Form.Control
+                      type="number"
+                      min="1"
+                      value={editedConfig.retention.weekly}
+                      onChange={(e) => setEditedConfig({
+                        ...editedConfig,
+                        retention: {
+                          ...editedConfig.retention,
+                          weekly: parseInt(e.target.value) || 4
+                        }
+                      })}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={4}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Backups Mensuales</Form.Label>
+                    <Form.Control
+                      type="number"
+                      min="1"
+                      value={editedConfig.retention.monthly}
+                      onChange={(e) => setEditedConfig({
+                        ...editedConfig,
+                        retention: {
+                          ...editedConfig.retention,
+                          monthly: parseInt(e.target.value) || 6
+                        }
+                      })}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <hr />
+
+              <h6 className="mb-3">MongoDB</h6>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Check
+                      type="switch"
+                      id="mongodb-enabled"
+                      label="Incluir MongoDB en backups"
+                      checked={editedConfig.mongodb.enabled}
+                      onChange={(e) => setEditedConfig({
+                        ...editedConfig,
+                        mongodb: {
+                          ...editedConfig.mongodb,
+                          enabled: e.target.checked
+                        }
+                      })}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Base de Datos</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={editedConfig.mongodb.database}
+                      onChange={(e) => setEditedConfig({
+                        ...editedConfig,
+                        mongodb: {
+                          ...editedConfig.mongodb,
+                          database: e.target.value
+                        }
+                      })}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <hr />
+
+              <h6 className="mb-3">Compresión</h6>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Check
+                      type="switch"
+                      id="compression-enabled"
+                      label="Comprimir backups"
+                      checked={editedConfig.compression.enabled}
+                      onChange={(e) => setEditedConfig({
+                        ...editedConfig,
+                        compression: {
+                          ...editedConfig.compression,
+                          enabled: e.target.checked
+                        }
+                      })}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Formato</Form.Label>
+                    <Form.Select
+                      value={editedConfig.compression.format}
+                      onChange={(e) => setEditedConfig({
+                        ...editedConfig,
+                        compression: {
+                          ...editedConfig.compression,
+                          format: e.target.value
+                        }
+                      })}
+                    >
+                      <option value="tar.gz">tar.gz (gzip)</option>
+                      <option value="tar.bz2">tar.bz2 (bzip2)</option>
+                      <option value="zip">zip</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              </Row>
+            </Form>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowConfigModal(false)}>
+            Cancelar
+          </Button>
+          <Button variant="primary" onClick={handleSaveConfig} disabled={saving}>
+            {saving ? (
+              <>
+                <Spinner animation="border" size="sm" className="me-1" />
+                Guardando...
+              </>
+            ) : (
+              <>
+                <i className="bi bi-save me-1"></i>
+                Guardar Configuración
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };

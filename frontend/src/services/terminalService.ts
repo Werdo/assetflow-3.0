@@ -70,6 +70,22 @@ class TerminalService {
     const response = await api.get('/admin/terminal/history');
     return response.data.data.history || [];
   }
+
+  /**
+   * Get configuration for backup or snapshot
+   */
+  async getConfig(type: 'backup' | 'snapshot'): Promise<any> {
+    const response = await api.get(`/admin/terminal/config/${type}`);
+    return response.data.data;
+  }
+
+  /**
+   * Update configuration for backup or snapshot
+   */
+  async updateConfig(type: 'backup' | 'snapshot', config: any): Promise<any> {
+    const response = await api.put(`/admin/terminal/config/${type}`, config);
+    return response.data.data;
+  }
 }
 
 export default new TerminalService();
