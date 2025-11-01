@@ -412,7 +412,14 @@ const IAConfigPage: React.FC = () => {
                   </Form.Label>
                   <InputGroup>
                     <Form.Control
-                      type={showApiKey ? 'text' : 'password'}
+                      as="textarea"
+                      rows={2}
+                      style={{
+                        fontFamily: 'monospace',
+                        fontSize: '0.9rem',
+                        resize: 'vertical',
+                        filter: showApiKey ? 'none' : 'blur(3px)'
+                      }}
                       placeholder="sk-..."
                       value={formData.apiKey}
                       onChange={(e) => handleFormChange('apiKey', e.target.value)}
@@ -421,6 +428,7 @@ const IAConfigPage: React.FC = () => {
                     <Button
                       variant="outline-secondary"
                       onClick={() => setShowApiKey(!showApiKey)}
+                      style={{ alignSelf: 'flex-start' }}
                     >
                       <i className={`bi bi-eye${showApiKey ? '-slash' : ''}`}></i>
                     </Button>
