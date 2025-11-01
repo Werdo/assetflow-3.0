@@ -28,7 +28,6 @@ export const RealTimeTerminal: React.FC<RealTimeTerminalProps> = ({
 }) => {
   const [output, setOutput] = useState<string[]>([]);
   const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
-  const eventSourceRef = useRef<EventSource | null>(null);
   const outputEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new output arrives

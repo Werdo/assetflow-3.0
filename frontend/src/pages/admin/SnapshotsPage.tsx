@@ -21,7 +21,6 @@ import {
 import toast from 'react-hot-toast';
 import terminalService from '../../services/terminalService';
 import RealTimeTerminal from '../../components/admin/RealTimeTerminal';
-import ScheduleSelector, { ScheduleTime, scheduleToCron, cronToSchedule } from '../../components/admin/ScheduleSelector';
 
 interface SnapshotFile {
   path: string;
@@ -60,11 +59,7 @@ export const SnapshotsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [snapshotsList, setSnapshotsList] = useState<SnapshotFile[]>([]);
   const [config, setConfig] = useState<SnapshotConfig | null>(null);
-  const [editedConfig, setEditedConfig] = useState<SnapshotConfig | null>(null);
-  const [showConfigModal, setShowConfigModal] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [executing, setExecuting] = useState(false);
-  const [scheduleTime, setScheduleTime] = useState<ScheduleTime>({ hour: '03', minute: '00' });
 
   // Remote push state
   const [showPushModal, setShowPushModal] = useState(false);
@@ -93,12 +88,6 @@ export const SnapshotsPage: React.FC = () => {
     try {
       const cfg = await terminalService.getConfig('snapshot');
       setConfig(cfg);
-      setEditedConfig(cfg);
-
-      // Parse schedule to ScheduleTime
-      if (cfg.schedule) {
-        setScheduleTime(cronToSchedule(cfg.schedule));
-      }
     } catch (error: any) {
       console.error('Error loading snapshot config:', error);
       toast.error('Error al cargar configuración');
@@ -137,30 +126,6 @@ export const SnapshotsPage: React.FC = () => {
       }, 2000);
     } else {
       toast.error('Error al ejecutar snapshot');
-    }
-  };
-
-  const handleSaveConfig = async () => {
-    if (!editedConfig) return;
-
-    // Update schedule from ScheduleTime
-    const updatedConfig = {
-      ...editedConfig,
-      schedule: scheduleToCron(scheduleTime)
-    };
-
-    setSaving(true);
-    try {
-      await terminalService.updateConfig('snapshot', updatedConfig);
-      toast.success('Configuración guardada y servicio reiniciado');
-      setConfig(updatedConfig);
-      setShowConfigModal(false);
-      await loadConfig();
-    } catch (error: any) {
-      console.error('Error saving config:', error);
-      toast.error('Error al guardar configuración');
-    } finally {
-      setSaving(false);
     }
   };
 
