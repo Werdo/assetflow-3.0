@@ -13,6 +13,7 @@ import DashboardPage from './pages/dashboard/DashboardPage';
 import ProductosPage from './pages/productos/ProductosPage';
 import ClientesPage from './pages/clientes/ClientesPage';
 import EmplazamientosPage from './pages/emplazamientos/EmplazamientosPage';
+import EmplazamientoDetailPage from './pages/emplazamientos/EmplazamientoDetailPage';
 import DepositosPage from './pages/depositos/DepositosPage';
 import AlertasPage from './pages/alertas/AlertasPage';
 import IAConfigPage from './pages/ia/IAConfigPage';
@@ -99,6 +100,16 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <EmplazamientosPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/emplazamientos/:id"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <EmplazamientoDetailPage />
                 </MainLayout>
               </ProtectedRoute>
             }

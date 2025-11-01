@@ -33,7 +33,7 @@ export const DashboardPage: React.FC = () => {
   const [errorAlertas, setErrorAlertas] = useState<string | null>(null);
 
   // Toggle entre mapa y tabla
-  const [viewMode, setViewMode] = useState<'map' | 'table'>('map');
+  const [viewMode, setViewMode] = useState<'map' | 'table'>('table');
 
   /**
    * Carga los KPIs del dashboard con manejo de errores extensivos
