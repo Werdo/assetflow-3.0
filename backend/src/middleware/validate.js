@@ -14,6 +14,7 @@ const handleValidationErrors = (req, res, next) => {
       value: err.value
     }));
 
+    console.error('[VALIDATION ERROR]', JSON.stringify(formattedErrors, null, 2));
     throw new ValidationError('Errores de validación', formattedErrors);
   }
 
