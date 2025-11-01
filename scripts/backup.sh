@@ -8,7 +8,7 @@
 set -eu
 
 # Configuration
-BACKUP_DIR="/app/backups"
+BACKUP_DIR="/backup"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 MONGO_HOST="${MONGO_HOST:-mongodb}"
 MONGO_PORT="${MONGO_PORT:-27017}"
