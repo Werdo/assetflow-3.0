@@ -2,44 +2,40 @@ const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 const terminalController = require('../controllers/terminalController');
-const { protect, isAdmin } = require('../middleware/auth');
+const { protect, protectDownload, isAdmin } = require('../middleware/auth');
 
-// All admin routes require authentication and admin role
-router.use(protect);
-router.use(isAdmin);
+// User Management Routes - require standard auth
+router.get('/users', protect, isAdmin, adminController.getAllUsers);
+router.get('/users/:id', protect, isAdmin, adminController.getUserById);
+router.post('/users', protect, isAdmin, adminController.createUser);
+router.put('/users/:id', protect, isAdmin, adminController.updateUser);
+router.delete('/users/:id', protect, isAdmin, adminController.deleteUser);
+router.post('/users/:id/reset-password', protect, isAdmin, adminController.resetUserPassword);
 
-// User Management Routes
-router.get('/users', adminController.getAllUsers);
-router.get('/users/:id', adminController.getUserById);
-router.post('/users', adminController.createUser);
-router.put('/users/:id', adminController.updateUser);
-router.delete('/users/:id', adminController.deleteUser);
-router.post('/users/:id/reset-password', adminController.resetUserPassword);
+// System Health & Stats Routes - require standard auth
+router.get('/system/health', protect, isAdmin, adminController.getSystemHealth);
+router.get('/system/stats', protect, isAdmin, adminController.getSystemStats);
+router.get('/system/database', protect, isAdmin, adminController.getDatabaseInfo);
 
-// System Health & Stats Routes
-router.get('/system/health', adminController.getSystemHealth);
-router.get('/system/stats', adminController.getSystemStats);
-router.get('/system/database', adminController.getDatabaseInfo);
+// Terminal & System Management Routes - require standard auth
+router.post('/terminal/execute', protect, isAdmin, terminalController.executeCommand);
+router.get('/terminal/commands', protect, isAdmin, terminalController.getAllowedCommands);
+router.get('/terminal/system-info', protect, isAdmin, terminalController.getSystemInfo);
+router.get('/terminal/history', protect, isAdmin, terminalController.getCommandHistory);
 
-// Terminal & System Management Routes
-router.post('/terminal/execute', terminalController.executeCommand);
-router.get('/terminal/commands', terminalController.getAllowedCommands);
-router.get('/terminal/system-info', terminalController.getSystemInfo);
-router.get('/terminal/history', terminalController.getCommandHistory);
+// Configuration Routes - require standard auth
+router.get('/terminal/config/:type', protect, isAdmin, terminalController.getConfig);
+router.put('/terminal/config/:type', protect, isAdmin, terminalController.updateConfig);
 
-// Configuration Routes
-router.get('/terminal/config/:type', terminalController.getConfig);
-router.put('/terminal/config/:type', terminalController.updateConfig);
+// Download Routes - use protectDownload to accept tokens in query params
+router.get('/backups/download/:filename', protectDownload, isAdmin, terminalController.downloadBackup);
+router.get('/snapshots/download/:filename', protectDownload, isAdmin, terminalController.downloadSnapshot);
 
-// Download Routes
-router.get('/backups/download/:filename', terminalController.downloadBackup);
-router.get('/snapshots/download/:filename', terminalController.downloadSnapshot);
+// Streaming Execution Routes - require standard auth
+router.post('/backups/execute-stream', protect, isAdmin, terminalController.executeBackupStream);
+router.post('/snapshots/execute-stream', protect, isAdmin, terminalController.executeSnapshotStream);
 
-// Streaming Execution Routes
-router.post('/backups/execute-stream', terminalController.executeBackupStream);
-router.post('/snapshots/execute-stream', terminalController.executeSnapshotStream);
-
-// Remote Push Route
-router.post('/snapshots/push-remote', terminalController.pushSnapshotToRemote);
+// Remote Push Route - require standard auth
+router.post('/snapshots/push-remote', protect, isAdmin, terminalController.pushSnapshotToRemote);
 
 module.exports = router;

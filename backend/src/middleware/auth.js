@@ -1,5 +1,5 @@
 const User = require('../models/User');
-const { verifyToken, extractTokenFromHeader } = require('../utils/jwt');
+const { verifyToken, extractTokenFromHeader, extractToken } = require('../utils/jwt');
 const { AuthenticationError, AuthorizationError } = require('../utils/errorHandler');
 const logger = require('../utils/logger');
 
@@ -39,6 +39,51 @@ const protect = async (req, res, next) => {
       message: error.message,
       url: req.originalUrl,
       ip: req.ip
+    });
+
+    next(error);
+  }
+};
+
+/**
+ * Middleware de autenticación para descargas de archivos
+ * Acepta tokens tanto en header Authorization como en query parameter ?token=
+ * Necesario para descargas directas desde el navegador
+ */
+const protectDownload = async (req, res, next) => {
+  try {
+    // Extraer token del header o query parameter
+    const token = extractToken(req);
+
+    if (!token) {
+      throw new AuthenticationError('No se proporcionó token de autenticación');
+    }
+
+    // Verificar token
+    const decoded = verifyToken(token);
+
+    // Buscar usuario
+    const user = await User.findById(decoded.id).select('-password');
+
+    if (!user) {
+      throw new AuthenticationError('Usuario no encontrado');
+    }
+
+    if (!user.active) {
+      throw new AuthenticationError('Usuario inactivo');
+    }
+
+    // Agregar usuario al request
+    req.user = user;
+
+    next();
+  } catch (error) {
+    logger.warn('Error de autenticación en descarga', {
+      message: error.message,
+      url: req.originalUrl,
+      ip: req.ip,
+      hasQueryToken: !!req.query.token,
+      hasAuthHeader: !!req.headers.authorization
     });
 
     next(error);
@@ -138,6 +183,7 @@ const isOwnerOrAdmin = (userIdParam = 'id') => {
 
 module.exports = {
   protect,
+  protectDownload,
   authorize,
   isAdmin,
   isAdminOrManager,

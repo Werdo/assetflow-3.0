@@ -75,6 +75,32 @@ const extractTokenFromHeader = (req) => {
 };
 
 /**
+ * Extrae el token del query parameter
+ * @param {Object} req - Objeto request de Express
+ * @returns {string|null} Token extraído o null si no existe
+ */
+const extractTokenFromQuery = (req) => {
+  return req.query.token || null;
+};
+
+/**
+ * Extrae el token del header Authorization o del query parameter
+ * Prioriza el header sobre el query parameter
+ * @param {Object} req - Objeto request de Express
+ * @returns {string|null} Token extraído o null si no existe
+ */
+const extractToken = (req) => {
+  // Intentar primero desde el header
+  const headerToken = extractTokenFromHeader(req);
+  if (headerToken) {
+    return headerToken;
+  }
+
+  // Si no hay en el header, intentar desde query parameter
+  return extractTokenFromQuery(req);
+};
+
+/**
  * Genera un token de refresh (duración más larga)
  * @param {Object} user - Objeto del usuario con _id
  * @returns {string} Token JWT firmado para refresh
@@ -137,6 +163,8 @@ module.exports = {
   verifyToken,
   decodeToken,
   extractTokenFromHeader,
+  extractTokenFromQuery,
+  extractToken,
   generateRefreshToken,
   isTokenExpired,
   getTokenTimeRemaining
