@@ -98,7 +98,22 @@ exports.getCliente = asyncHandler(async (req, res) => {
  * @access  Private (Admin/Manager)
  */
 exports.createCliente = asyncHandler(async (req, res) => {
-  const { nombre, cif, direccion, contacto, notas, esSubcliente, clientePrincipal } = req.body;
+  const {
+    nombre,
+    cif,
+    direccion,
+    direccionFiscal,
+    ciudad,
+    provincia,
+    codigoPostal,
+    pais,
+    contacto,
+    telefono,
+    email,
+    notas,
+    esSubcliente,
+    clientePrincipal
+  } = req.body;
 
   // Verificar CIF único si se proporciona
   if (cif) {
@@ -124,11 +139,26 @@ exports.createCliente = asyncHandler(async (req, res) => {
     }
   }
 
+  // Transform flat structure to nested structure for model
+  const direccionNested = direccion || {
+    calle: direccionFiscal || '',
+    ciudad: ciudad || '',
+    provincia: provincia || '',
+    codigoPostal: codigoPostal || '',
+    pais: pais || 'España'
+  };
+
+  const contactoNested = (typeof contacto === 'object' && contacto !== null) ? contacto : {
+    nombre: contacto || '',
+    telefono: telefono || '',
+    email: email || ''
+  };
+
   const cliente = await Cliente.create({
     nombre,
     cif: cif ? cif.toUpperCase() : undefined,
-    direccion,
-    contacto,
+    direccion: direccionNested,
+    contacto: contactoNested,
     notas,
     esSubcliente: esSubcliente || false,
     clientePrincipal: esSubcliente ? clientePrincipal : null
@@ -162,7 +192,23 @@ exports.updateCliente = asyncHandler(async (req, res) => {
     throw new NotFoundError('Cliente');
   }
 
-  const { nombre, cif, direccion, contacto, notas, activo, esSubcliente, clientePrincipal } = req.body;
+  const {
+    nombre,
+    cif,
+    direccion,
+    direccionFiscal,
+    ciudad,
+    provincia,
+    codigoPostal,
+    pais,
+    contacto,
+    telefono,
+    email,
+    notas,
+    activo,
+    esSubcliente,
+    clientePrincipal
+  } = req.body;
 
   // Si cambia el CIF, verificar que no exista
   if (cif && cif.toUpperCase() !== cliente.cif) {
@@ -209,8 +255,35 @@ exports.updateCliente = asyncHandler(async (req, res) => {
   }
 
   if (nombre) cliente.nombre = nombre;
-  if (direccion) cliente.direccion = direccion;
-  if (contacto) cliente.contacto = contacto;
+
+  // Transform flat direccion fields to nested structure
+  if (direccion) {
+    cliente.direccion = direccion;
+  } else if (direccionFiscal || ciudad || provincia || codigoPostal || pais) {
+    cliente.direccion = {
+      calle: direccionFiscal || cliente.direccion?.calle || '',
+      ciudad: ciudad || cliente.direccion?.ciudad || '',
+      provincia: provincia || cliente.direccion?.provincia || '',
+      codigoPostal: codigoPostal || cliente.direccion?.codigoPostal || '',
+      pais: pais || cliente.direccion?.pais || 'España'
+    };
+  }
+
+  // Transform flat contacto fields to nested structure
+  if (contacto !== undefined || telefono !== undefined || email !== undefined) {
+    if (typeof contacto === 'object' && contacto !== null) {
+      // If contacto is already an object, use it
+      cliente.contacto = contacto;
+    } else {
+      // Transform flat fields to nested structure
+      cliente.contacto = {
+        nombre: contacto || cliente.contacto?.nombre || '',
+        telefono: telefono || cliente.contacto?.telefono || '',
+        email: email || cliente.contacto?.email || ''
+      };
+    }
+  }
+
   if (notas !== undefined) cliente.notas = notas;
   if (activo !== undefined) cliente.activo = activo;
 
