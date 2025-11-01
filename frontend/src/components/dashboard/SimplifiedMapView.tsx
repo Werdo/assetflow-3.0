@@ -4,9 +4,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Card, Spinner, Alert, Button, Table, Form, Row, Col, InputGroup, Badge } from 'react-bootstrap';
+import { Card, Spinner, Alert, Button, Table, Form, Row, Col, InputGroup, Badge, Dropdown } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import clienteService from '../../services/clienteService';
+import emplazamientoService from '../../services/emplazamientoService';
 import type { EmplazamientoMapData, Cliente } from '../../types';
 
 interface SimplifiedMapViewProps {
@@ -25,6 +27,7 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
 }) => {
   const navigate = useNavigate();
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,6 +74,35 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
 
   // Obtener subclientes disponibles
   const subclientes = clientes.filter(c => c.esSubcliente);
+
+  // Manejar inactivación de emplazamiento
+  const handleInactivar = async (emplazamientoId: string, nombre: string) => {
+    if (!window.confirm(`¿Estás seguro de inactivar el emplazamiento "${nombre}"?`)) {
+      return;
+    }
+
+    try {
+      setActionLoading(emplazamientoId);
+      await emplazamientoService.update(emplazamientoId, { estado: 'inactivo' });
+      toast.success(`Emplazamiento "${nombre}" inactivado correctamente`);
+      // Recargar página para actualizar datos
+      window.location.reload();
+    } catch (error: any) {
+      toast.error(error.message || 'Error al inactivar emplazamiento');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Navegar a depósitos del emplazamiento
+  const handleVerDepositos = (emplazamientoId: string) => {
+    navigate(`/depositos?emplazamiento=${emplazamientoId}`);
+  };
+
+  // Ver detalle del emplazamiento
+  const handleVerDetalle = (emplazamientoId: string) => {
+    navigate(`/emplazamientos/${emplazamientoId}`);
+  };
 
   // Filtrado
   const emplazamientosFiltrados = emplazamientos.filter((e) => {
@@ -377,13 +409,42 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
                         </Badge>
                       </td>
                       <td className="text-center">
-                        <Button
-                          variant="outline-primary"
-                          size="sm"
-                          onClick={() => navigate(`/emplazamientos/${emp._id}`)}
-                        >
-                          <i className="bi bi-eye"></i>
-                        </Button>
+                        <Dropdown>
+                          <Dropdown.Toggle
+                            variant="outline-primary"
+                            size="sm"
+                            id={`dropdown-${emp._id}`}
+                            disabled={actionLoading === emp._id}
+                          >
+                            {actionLoading === emp._id ? (
+                              <Spinner animation="border" size="sm" />
+                            ) : (
+                              <>
+                                <i className="bi bi-three-dots-vertical"></i>
+                                <span className="ms-1">Acciones</span>
+                              </>
+                            )}
+                          </Dropdown.Toggle>
+
+                          <Dropdown.Menu>
+                            <Dropdown.Item onClick={() => handleVerDetalle(emp._id)}>
+                              <i className="bi bi-eye me-2"></i>
+                              Ver Detalle
+                            </Dropdown.Item>
+                            <Dropdown.Item onClick={() => handleVerDepositos(emp._id)}>
+                              <i className="bi bi-box-seam me-2"></i>
+                              Ver Depósitos ({emp.depositosActivos || 0})
+                            </Dropdown.Item>
+                            <Dropdown.Divider />
+                            <Dropdown.Item
+                              onClick={() => handleInactivar(emp._id, emp.nombre)}
+                              className="text-danger"
+                            >
+                              <i className="bi bi-x-circle me-2"></i>
+                              Inactivar Emplazamiento
+                            </Dropdown.Item>
+                          </Dropdown.Menu>
+                        </Dropdown>
                       </td>
                     </tr>
                   );
