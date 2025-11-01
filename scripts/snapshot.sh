@@ -10,7 +10,7 @@ set -euo pipefail
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="${SCRIPT_DIR}/snapshot.config.json"
-LOG_FILE="/var/log/assetflow/snapshot.log"
+LOG_FILE="/snapshots/snapshot.log"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Colors

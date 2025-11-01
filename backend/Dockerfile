@@ -2,8 +2,13 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install curl for healthcheck and mongodb-tools for backups
-RUN apk add --no-cache curl mongodb-tools
+# Install dependencies:
+# - curl: for healthcheck
+# - mongodb-tools: for database backups
+# - bash: for snapshot scripts
+# - jq: for JSON processing in snapshot scripts
+# - docker-cli: for creating container snapshots
+RUN apk add --no-cache curl mongodb-tools bash jq docker-cli
 
 # Copy package files
 COPY package*.json ./

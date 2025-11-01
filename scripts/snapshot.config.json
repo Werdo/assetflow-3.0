@@ -19,7 +19,7 @@
     }
   ],
   "destination": {
-    "path": "/var/snapshots/assetflow",
+    "path": "/snapshots",
     "format": "tar"
   },
   "retention": {

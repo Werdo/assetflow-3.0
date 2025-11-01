@@ -148,7 +148,7 @@ class TerminalService {
 
       'snapshot-status': async () => {
         try {
-          const logPath = '/var/log/assetflow/snapshot.log';
+          const logPath = '/snapshots/snapshot.log';
           const { stdout } = await execAsync(`tail -20 ${logPath}`);
           return { success: true, output: stdout, type: 'text' };
         } catch (error) {
@@ -168,7 +168,7 @@ class TerminalService {
 
       'snapshot-list': async () => {
         try {
-          const snapshotDir = '/var/snapshots/assetflow';
+          const snapshotDir = '/snapshots';
           const { stdout } = await execAsync(`find ${snapshotDir} -type f -name "*.tar.gz" | sort -r | head -20`);
           const files = stdout.trim().split('\n').filter(f => f);
 
@@ -579,7 +579,7 @@ class TerminalService {
       return;
     }
 
-    const snapshotDir = '/var/snapshots/assetflow';
+    const snapshotDir = '/snapshots';
     const localPath = path.join(snapshotDir, filename);
 
     // Build SCP command with sshpass if password is provided, or without for key-based auth
@@ -671,7 +671,7 @@ class TerminalService {
         throw new Error('Nombre de archivo inválido');
       }
 
-      const snapshotDir = '/var/snapshots/assetflow';
+      const snapshotDir = '/snapshots';
       const filePath = path.join(snapshotDir, filename);
 
       // Verificar que el archivo existe
