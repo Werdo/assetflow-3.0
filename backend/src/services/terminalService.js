@@ -466,8 +466,8 @@ class TerminalService {
     // In production (Linux), run actual snapshot script
     const scriptPath = path.join(this.scriptsDir, 'snapshot.sh');
 
-    // Spawn snapshot process
-    const snapshotProcess = spawn('sh', [scriptPath]);
+    // Spawn snapshot process with bash (snapshot.sh uses bash-specific syntax)
+    const snapshotProcess = spawn('bash', [scriptPath]);
 
     // Stream stdout
     snapshotProcess.stdout.on('data', (data) => {
