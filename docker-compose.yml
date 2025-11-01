@@ -59,6 +59,7 @@ services:
       - ./backend/uploads:/app/uploads
       - ./backend/.logs:/app/.logs
       - ./backup:/backup
+      - ./scripts:/scripts
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
       interval: 30s
