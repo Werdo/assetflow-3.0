@@ -1,0 +1,30 @@
+{
+  "enabled": true,
+  "schedule": "0 */6 * * *",
+  "containers": [
+    {
+      "name": "assetflow-backend",
+      "enabled": true,
+      "includeVolumes": true
+    },
+    {
+      "name": "assetflow-frontend",
+      "enabled": true,
+      "includeVolumes": false
+    },
+    {
+      "name": "mongodb",
+      "enabled": true,
+      "includeVolumes": true
+    }
+  ],
+  "destination": {
+    "path": "/var/snapshots/assetflow",
+    "format": "tar"
+  },
+  "retention": {
+    "count": 10,
+    "maxAgeDays": 30
+  },
+  "autoCleanup": true
+}

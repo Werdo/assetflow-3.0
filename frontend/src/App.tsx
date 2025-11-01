@@ -23,6 +23,7 @@ import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import UsersPage from './pages/admin/UsersPage';
 import SystemPage from './pages/admin/SystemPage';
 import SettingsPage from './pages/admin/SettingsPage';
+import TerminalPage from './pages/admin/TerminalPage';
 import { Toaster } from 'react-hot-toast';
 
 // Import Bootstrap CSS and Leaflet CSS
@@ -202,6 +203,16 @@ function App() {
               <ProtectedRoute requiredRole="admin">
                 <AdminLayout>
                   <SettingsPage />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/terminal"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminLayout>
+                  <TerminalPage />
                 </AdminLayout>
               </ProtectedRoute>
             }

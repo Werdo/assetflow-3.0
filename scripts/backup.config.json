@@ -1,0 +1,49 @@
+{
+  "enabled": true,
+  "schedule": "0 2 * * *",
+  "retention": {
+    "daily": 7,
+    "weekly": 4,
+    "monthly": 6
+  },
+  "destinations": {
+    "local": {
+      "enabled": true,
+      "path": "/var/backups/assetflow"
+    },
+    "remote": {
+      "enabled": false,
+      "type": "ssh",
+      "host": "",
+      "port": 22,
+      "user": "",
+      "path": ""
+    }
+  },
+  "mongodb": {
+    "enabled": true,
+    "host": "mongodb",
+    "port": 27017,
+    "database": "assetflow",
+    "username": "admin",
+    "password": "assetflow2025secure",
+    "authSource": "admin"
+  },
+  "files": {
+    "enabled": true,
+    "paths": [
+      "/var/www/assetflow/.env",
+      "/var/www/assetflow/docker-compose.yml"
+    ]
+  },
+  "compression": {
+    "enabled": true,
+    "format": "tar.gz"
+  },
+  "notifications": {
+    "enabled": false,
+    "email": "",
+    "onSuccess": false,
+    "onFailure": true
+  }
+}

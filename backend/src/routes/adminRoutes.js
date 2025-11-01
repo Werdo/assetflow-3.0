@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
+const terminalController = require('../controllers/terminalController');
 const { protect, isAdmin } = require('../middleware/auth');
 
 // All admin routes require authentication and admin role
@@ -19,5 +20,11 @@ router.post('/users/:id/reset-password', adminController.resetUserPassword);
 router.get('/system/health', adminController.getSystemHealth);
 router.get('/system/stats', adminController.getSystemStats);
 router.get('/system/database', adminController.getDatabaseInfo);
+
+// Terminal & System Management Routes
+router.post('/terminal/execute', terminalController.executeCommand);
+router.get('/terminal/commands', terminalController.getAllowedCommands);
+router.get('/terminal/system-info', terminalController.getSystemInfo);
+router.get('/terminal/history', terminalController.getCommandHistory);
 
 module.exports = router;
