@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Alert, Table, Badge, Spinner, Form } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Alert, Table, Badge, Spinner } from 'react-bootstrap';
 import toast from 'react-hot-toast';
 import terminalService from '../../services/terminalService';
 
