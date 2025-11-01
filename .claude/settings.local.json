@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(npm install:*)",
+      "Bash(node import_emplazamientos.js:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(node check_db.js:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker exec:*)",
+      "Bash(node create_cliente.js:*)",
+      "Bash(node:*)",
+      "Bash(npm start)",
+      "Bash(docker cp:*)",
+      "Bash(./backup_transfer/cliente_omnitrade.json)",
+      "Bash(./backup_transfer/emplazamientos_omnitrade.json)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill /PID 44716 /F)",
+      "Bash(taskkill:*)",
+      "Bash(npm run dev:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nFeature: Sistema completo de trazabilidad y subclientes\n\nImplementación de tres funcionalidades principales:\n\n1. Sistema de Trazabilidad:\n   - Gestión de códigos unitarios en depósitos\n   - Búsqueda por código unitario (IMEI/ICCID)\n   - Importación CSV con detección automática de formato\n   - Validación de duplicados cross-depósito\n\n2. Soporte para Subclientes:\n   - Jerarquía cliente principal/subcliente\n   - Asignación de subclientes en depósitos y emplazamientos\n   - Validaciones de relaciones y permisos\n   - Filtrado y búsqueda por subcliente\n\n3. Formato de Balizas (IMEI + ICCID):\n   - Parser CSV mejorado para múltiples códigos por línea\n   - Soporta separadores: espacio, coma, punto y coma, tab\n   - Detección automática de formato con/sin cabecera\n   - Códigos alfanuméricos (IMEI numérico + ICCID alfanumérico)\n\nBackend:\n- Nuevo campo trazabilidad en Deposito model\n- Nuevos endpoints: buscar-codigo, importar-codigos, agregar-codigos\n- Cliente y subcliente almacenados directamente en Deposito\n- Validaciones de jerarquía cliente-subcliente\n\nFrontend:\n- UI para activar trazabilidad en depósitos\n- Importación CSV con feedback de conflictos\n- Selector de subclientes en formularios\n- Visualización de códigos unitarios\n\nDocumentación:\n- FORMATO_IMPORTACION_SERIES.md (especificación completa)\n- PLANTILLA_IMPORTACION_NUMEROS_SERIE.csv (template)\n- EJEMPLO_BALIZAS.txt (10 ejemplos IMEI+ICCID)\n- PRUEBA_IMPORTACION_20_SERIES.csv (test file)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(sshpass -p \"bb474edf\" ssh -o StrictHostKeyChecking=no Admin@167.235.58.24 \"cd /var/www/assetflow && git pull origin main && sudo docker-compose restart backend frontend\")",
+      "Bash(NUL)",
+      "Bash(powershell -ExecutionPolicy Bypass -File deploy.ps1)",
+      "Bash(cat:*)",
+      "Bash(rsync:*)",
+      "Bash(tar:*)",
+      "Bash(git tag:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

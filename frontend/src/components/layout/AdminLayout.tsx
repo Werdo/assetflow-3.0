@@ -40,6 +40,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       ],
     },
     {
+      section: 'Herramientas del Sistema',
+      items: [
+        { path: '/admin/terminal', icon: 'terminal-fill', label: 'Terminal' },
+        { path: '/admin/backups', icon: 'database-fill-gear', label: 'Backups' },
+        { path: '/admin/snapshots', icon: 'camera-fill', label: 'Snapshots' },
+      ],
+    },
+    {
       section: 'Sistema Principal',
       items: [
         { path: '/dashboard', icon: 'house-door', label: 'Volver al Dashboard' },
