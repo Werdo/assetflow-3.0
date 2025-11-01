@@ -126,7 +126,7 @@ class TerminalService {
 
       'backup-list': async () => {
         try {
-          const backupDir = '/var/backups/assetflow';
+          const backupDir = '/backup';
           const { stdout } = await execAsync(`find ${backupDir} -type f -name "*.tar.gz" | sort -r | head -20`);
           const files = stdout.trim().split('\n').filter(f => f);
 
@@ -647,7 +647,7 @@ class TerminalService {
         throw new Error('Nombre de archivo inválido');
       }
 
-      const backupDir = '/var/backups/assetflow';
+      const backupDir = '/backup';
       const filePath = path.join(backupDir, filename);
 
       // Verificar que el archivo existe
