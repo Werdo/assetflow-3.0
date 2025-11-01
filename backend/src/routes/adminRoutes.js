@@ -31,4 +31,15 @@ router.get('/terminal/history', terminalController.getCommandHistory);
 router.get('/terminal/config/:type', terminalController.getConfig);
 router.put('/terminal/config/:type', terminalController.updateConfig);
 
+// Download Routes
+router.get('/backups/download/:filename', terminalController.downloadBackup);
+router.get('/snapshots/download/:filename', terminalController.downloadSnapshot);
+
+// Streaming Execution Routes
+router.post('/backups/execute-stream', terminalController.executeBackupStream);
+router.post('/snapshots/execute-stream', terminalController.executeSnapshotStream);
+
+// Remote Push Route
+router.post('/snapshots/push-remote', terminalController.pushSnapshotToRemote);
+
 module.exports = router;

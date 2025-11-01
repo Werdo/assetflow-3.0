@@ -1,12 +1,33 @@
 /**
- * AssetFlow - Backups Configuration Page
- * Página de configuración y gestión de backups
+ * AssetFlow - Backups Management Page (Redesigned)
+ * Complete backup management with simplified configuration,
+ * real-time execution, and download functionality
  */
 
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Alert, Table, Badge, Spinner, Modal, Form } from 'react-bootstrap';
+import {
+  Container,
+  Row,
+  Col,
+  Card,
+  Button,
+  Alert,
+  Table,
+  Badge,
+  Spinner,
+  Modal,
+  Form
+} from 'react-bootstrap';
 import toast from 'react-hot-toast';
 import terminalService from '../../services/terminalService';
+import RealTimeTerminal from '../../components/admin/RealTimeTerminal';
+import ScheduleSelector, { ScheduleTime, scheduleToCron, cronToSchedule } from '../../components/admin/ScheduleSelector';
+
+interface BackupFile {
+  path: string;
+  size: string;
+  date: string;
+}
 
 interface BackupConfig {
   enabled: boolean;
@@ -34,92 +55,111 @@ interface BackupConfig {
 
 export const BackupsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [backupsList, setBackupsList] = useState<any[]>([]);
-  const [backupStatus, setBackupStatus] = useState<string>('');
-  const [executing, setExecuting] = useState(false);
-  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [backupsList, setBackupsList] = useState<BackupFile[]>([]);
   const [config, setConfig] = useState<BackupConfig | null>(null);
   const [editedConfig, setEditedConfig] = useState<BackupConfig | null>(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [executing, setExecuting] = useState(false);
+  const [scheduleTime, setScheduleTime] = useState<ScheduleTime>({ hour: '02', minute: '00' });
 
   useEffect(() => {
-    loadBackupsInfo();
-    loadConfig();
+    loadData();
   }, []);
+
+  const loadData = async () => {
+    await Promise.all([
+      loadConfig(),
+      loadBackupsList()
+    ]);
+  };
 
   const loadConfig = async () => {
     try {
       const cfg = await terminalService.getConfig('backup');
       setConfig(cfg);
       setEditedConfig(cfg);
+
+      // Parse schedule to ScheduleTime
+      if (cfg.schedule) {
+        setScheduleTime(cronToSchedule(cfg.schedule));
+      }
     } catch (error: any) {
       console.error('Error loading backup config:', error);
       toast.error('Error al cargar configuración');
     }
   };
 
-  const loadBackupsInfo = async () => {
+  const loadBackupsList = async () => {
     setLoading(true);
     try {
-      // Load backup status
-      const statusResult = await terminalService.executeCommand('backup-status');
-      if (statusResult.success) {
-        setBackupStatus(statusResult.output);
-      }
-
-      // Load backups list
-      const listResult = await terminalService.executeCommand('backup-list');
-      if (listResult.success && listResult.type === 'json') {
-        setBackupsList(listResult.output);
+      const result = await terminalService.executeCommand('backup-list');
+      if (result.success && result.type === 'json') {
+        setBackupsList(result.output);
       }
     } catch (error: any) {
-      console.error('Error loading backups:', error);
-      toast.error('Error al cargar información de backups');
+      console.error('Error loading backups list:', error);
+      toast.error('Error al cargar lista de backups');
     } finally {
       setLoading(false);
     }
   };
 
-  const executeBackup = async () => {
+  const handleExecuteBackup = () => {
     if (!confirm('¿Ejecutar backup manualmente? Este proceso puede tardar varios minutos.')) {
       return;
     }
-
     setExecuting(true);
-    try {
-      const result = await terminalService.executeCommand('backup-run');
-      if (result.success) {
-        toast.success('Backup ejecutado exitosamente');
-        loadBackupsInfo();
-      } else {
-        toast.error('Error al ejecutar backup');
-      }
-    } catch (error: any) {
+  };
+
+  const handleExecutionComplete = (success: boolean) => {
+    setExecuting(false);
+    if (success) {
+      toast.success('Backup completado exitosamente');
+      // Reload backups list after a short delay
+      setTimeout(() => {
+        loadBackupsList();
+      }, 2000);
+    } else {
       toast.error('Error al ejecutar backup');
-    } finally {
-      setExecuting(false);
     }
   };
 
   const handleSaveConfig = async () => {
     if (!editedConfig) return;
 
+    // Update schedule from ScheduleTime
+    const updatedConfig = {
+      ...editedConfig,
+      schedule: scheduleToCron(scheduleTime)
+    };
+
     setSaving(true);
     try {
-      await terminalService.updateConfig('backup', editedConfig);
-      toast.success('Configuración guardada exitosamente');
-      setConfig(editedConfig);
+      await terminalService.updateConfig('backup', updatedConfig);
+      toast.success('Configuración guardada y servicio reiniciado');
+      setConfig(updatedConfig);
       setShowConfigModal(false);
-      loadConfig();
+      await loadConfig();
     } catch (error: any) {
+      console.error('Error saving config:', error);
       toast.error('Error al guardar configuración');
     } finally {
       setSaving(false);
     }
   };
 
+  const handleDownload = (filename: string) => {
+    const downloadUrl = terminalService.getBackupDownloadUrl(filename);
+    window.open(downloadUrl, '_blank');
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('es-ES');
+  };
+
+  const getFilenameFromPath = (path: string) => {
+    return path.split('/').pop() || path;
   };
 
   return (
@@ -141,14 +181,14 @@ export const BackupsPage: React.FC = () => {
               <Button
                 variant="outline-secondary"
                 onClick={() => setShowConfigModal(true)}
-                disabled={loading || !config}
+                disabled={loading || !config || executing}
               >
                 <i className="bi bi-gear me-1"></i>
                 Configurar
               </Button>
               <Button
                 variant="outline-primary"
-                onClick={loadBackupsInfo}
+                onClick={loadData}
                 disabled={loading || executing}
               >
                 <i className="bi bi-arrow-clockwise me-1"></i>
@@ -156,7 +196,7 @@ export const BackupsPage: React.FC = () => {
               </Button>
               <Button
                 variant="success"
-                onClick={executeBackup}
+                onClick={handleExecuteBackup}
                 disabled={loading || executing}
               >
                 {executing ? (
@@ -182,11 +222,11 @@ export const BackupsPage: React.FC = () => {
           <Col lg={6}>
             <Card className="border-0 shadow-sm h-100">
               <Card.Header className="bg-primary text-white">
-                <i className="bi bi-gear-fill me-2"></i>
+                <i className="bi bi-info-circle me-2"></i>
                 Configuración Actual
               </Card.Header>
               <Card.Body>
-                <Table size="sm" className="mb-0">
+                <Table size="sm" className="mb-0" borderless>
                   <tbody>
                     <tr>
                       <td className="fw-semibold">Estado</td>
@@ -198,24 +238,31 @@ export const BackupsPage: React.FC = () => {
                     </tr>
                     <tr>
                       <td className="fw-semibold">Horario</td>
-                      <td>{config.schedule}</td>
+                      <td>
+                        <code>{config.schedule}</code>
+                        <span className="ms-2 text-muted small">
+                          (diario a las {cronToSchedule(config.schedule).hour}:{cronToSchedule(config.schedule).minute})
+                        </span>
+                      </td>
                     </tr>
                     <tr>
-                      <td className="fw-semibold">Retención Diaria</td>
-                      <td>{config.retention.daily} backups</td>
+                      <td className="fw-semibold">Retención</td>
+                      <td>
+                        {config.retention.daily}d / {config.retention.weekly}s / {config.retention.monthly}m
+                      </td>
                     </tr>
                     <tr>
-                      <td className="fw-semibold">Retención Semanal</td>
-                      <td>{config.retention.weekly} backups</td>
-                    </tr>
-                    <tr>
-                      <td className="fw-semibold">Retención Mensual</td>
-                      <td>{config.retention.monthly} backups</td>
+                      <td className="fw-semibold">Base de Datos</td>
+                      <td>
+                        <Badge bg={config.mongodb.enabled ? 'success' : 'secondary'}>
+                          {config.mongodb.database}
+                        </Badge>
+                      </td>
                     </tr>
                     <tr>
                       <td className="fw-semibold">Compresión</td>
                       <td>
-                        <Badge bg="success">{config.compression.format}</Badge>
+                        <Badge bg="info">{config.compression.format}</Badge>
                       </td>
                     </tr>
                   </tbody>
@@ -227,7 +274,7 @@ export const BackupsPage: React.FC = () => {
           <Col lg={6}>
             <Card className="border-0 shadow-sm h-100">
               <Card.Header className="bg-info text-white">
-                <i className="bi bi-clipboard-check me-2"></i>
+                <i className="bi bi-check2-circle me-2"></i>
                 Qué se Incluye
               </Card.Header>
               <Card.Body>
@@ -238,7 +285,7 @@ export const BackupsPage: React.FC = () => {
                   </li>
                   <li className="mb-2">
                     <i className={`bi bi-check-circle-fill ${config.files.enabled ? 'text-success' : 'text-secondary'} me-2`}></i>
-                    <strong>Archivos de Configuración:</strong> {config.files.paths.length} archivos
+                    <strong>Archivos:</strong> {config.files.paths.length} rutas configuradas
                   </li>
                   <li className="mb-2">
                     <i className="bi bi-check-circle-fill text-success me-2"></i>
@@ -255,21 +302,16 @@ export const BackupsPage: React.FC = () => {
         </Row>
       )}
 
-      {/* Backup Status */}
-      {backupStatus && (
+      {/* Real-Time Terminal */}
+      {executing && (
         <Row className="mb-4">
           <Col>
-            <Card className="border-0 shadow-sm">
-              <Card.Header className="bg-dark text-white">
-                <i className="bi bi-file-earmark-text me-2"></i>
-                Últimos Logs
-              </Card.Header>
-              <Card.Body>
-                <pre className="mb-0 bg-dark text-light p-3 rounded" style={{ maxHeight: '300px', overflow: 'auto' }}>
-                  {backupStatus}
-                </pre>
-              </Card.Body>
-            </Card>
+            <RealTimeTerminal
+              endpoint={terminalService.getBackupStreamUrl()}
+              isExecuting={executing}
+              onComplete={handleExecutionComplete}
+              title="Ejecución de Backup en Tiempo Real"
+            />
           </Col>
         </Row>
       )}
@@ -304,14 +346,14 @@ export const BackupsPage: React.FC = () => {
                         <th>Archivo</th>
                         <th>Tamaño</th>
                         <th>Fecha</th>
-                        <th>Acciones</th>
+                        <th className="text-center">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       {backupsList.map((backup, idx) => (
                         <tr key={idx}>
                           <td>
-                            <code className="small">{backup.path.split('/').pop()}</code>
+                            <code className="small">{getFilenameFromPath(backup.path)}</code>
                           </td>
                           <td>
                             <Badge bg="secondary">{backup.size}</Badge>
@@ -319,15 +361,14 @@ export const BackupsPage: React.FC = () => {
                           <td className="text-muted small">
                             {formatDate(backup.date)}
                           </td>
-                          <td>
+                          <td className="text-center">
                             <Button
-                              variant="outline-primary"
+                              variant="outline-success"
                               size="sm"
-                              disabled
-                              title="Función de restauración próximamente"
+                              onClick={() => handleDownload(getFilenameFromPath(backup.path))}
                             >
-                              <i className="bi bi-arrow-counterclockwise me-1"></i>
-                              Restaurar
+                              <i className="bi bi-download me-1"></i>
+                              Descargar
                             </Button>
                           </td>
                         </tr>
@@ -355,37 +396,31 @@ export const BackupsPage: React.FC = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Estado del Sistema</Form.Label>
                     <Form.Check
                       type="switch"
                       id="backup-enabled"
-                      label={editedConfig.enabled ? 'Habilitado' : 'Deshabilitado'}
+                      label="Backups Automáticos"
                       checked={editedConfig.enabled}
                       onChange={(e) => setEditedConfig({
                         ...editedConfig,
                         enabled: e.target.checked
                       })}
                     />
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Horario (cron)</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={editedConfig.schedule}
-                      onChange={(e) => setEditedConfig({
-                        ...editedConfig,
-                        schedule: e.target.value
-                      })}
-                      placeholder="0 2 * * *"
-                    />
                     <Form.Text className="text-muted">
-                      Formato cron: minuto hora día mes día-semana
+                      Habilitar o deshabilitar la ejecución automática de backups
                     </Form.Text>
                   </Form.Group>
                 </Col>
               </Row>
+
+              <hr />
+
+              <ScheduleSelector
+                value={scheduleTime}
+                onChange={setScheduleTime}
+                label="Horario de Ejecución Diaria"
+                disabled={!editedConfig.enabled}
+              />
 
               <hr />
 
@@ -397,6 +432,7 @@ export const BackupsPage: React.FC = () => {
                     <Form.Control
                       type="number"
                       min="1"
+                      max="30"
                       value={editedConfig.retention.daily}
                       onChange={(e) => setEditedConfig({
                         ...editedConfig,
@@ -406,6 +442,7 @@ export const BackupsPage: React.FC = () => {
                         }
                       })}
                     />
+                    <Form.Text className="text-muted">Últimos N días</Form.Text>
                   </Form.Group>
                 </Col>
                 <Col md={4}>
@@ -414,6 +451,7 @@ export const BackupsPage: React.FC = () => {
                     <Form.Control
                       type="number"
                       min="1"
+                      max="12"
                       value={editedConfig.retention.weekly}
                       onChange={(e) => setEditedConfig({
                         ...editedConfig,
@@ -423,6 +461,7 @@ export const BackupsPage: React.FC = () => {
                         }
                       })}
                     />
+                    <Form.Text className="text-muted">Últimas N semanas</Form.Text>
                   </Form.Group>
                 </Col>
                 <Col md={4}>
@@ -431,6 +470,7 @@ export const BackupsPage: React.FC = () => {
                     <Form.Control
                       type="number"
                       min="1"
+                      max="24"
                       value={editedConfig.retention.monthly}
                       onChange={(e) => setEditedConfig({
                         ...editedConfig,
@@ -440,59 +480,21 @@ export const BackupsPage: React.FC = () => {
                         }
                       })}
                     />
+                    <Form.Text className="text-muted">Últimos N meses</Form.Text>
                   </Form.Group>
                 </Col>
               </Row>
 
               <hr />
 
-              <h6 className="mb-3">MongoDB</h6>
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Check
-                      type="switch"
-                      id="mongodb-enabled"
-                      label="Incluir MongoDB en backups"
-                      checked={editedConfig.mongodb.enabled}
-                      onChange={(e) => setEditedConfig({
-                        ...editedConfig,
-                        mongodb: {
-                          ...editedConfig.mongodb,
-                          enabled: e.target.checked
-                        }
-                      })}
-                    />
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Base de Datos</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={editedConfig.mongodb.database}
-                      onChange={(e) => setEditedConfig({
-                        ...editedConfig,
-                        mongodb: {
-                          ...editedConfig.mongodb,
-                          database: e.target.value
-                        }
-                      })}
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-
-              <hr />
-
-              <h6 className="mb-3">Compresión</h6>
+              <h6 className="mb-3">Opciones de Compresión</h6>
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
                     <Form.Check
                       type="switch"
                       id="compression-enabled"
-                      label="Comprimir backups"
+                      label="Comprimir Backups"
                       checked={editedConfig.compression.enabled}
                       onChange={(e) => setEditedConfig({
                         ...editedConfig,
@@ -506,7 +508,7 @@ export const BackupsPage: React.FC = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Formato</Form.Label>
+                    <Form.Label>Formato de Compresión</Form.Label>
                     <Form.Select
                       value={editedConfig.compression.format}
                       onChange={(e) => setEditedConfig({
@@ -516,6 +518,7 @@ export const BackupsPage: React.FC = () => {
                           format: e.target.value
                         }
                       })}
+                      disabled={!editedConfig.compression.enabled}
                     >
                       <option value="tar.gz">tar.gz (gzip)</option>
                       <option value="tar.bz2">tar.bz2 (bzip2)</option>
@@ -540,7 +543,7 @@ export const BackupsPage: React.FC = () => {
             ) : (
               <>
                 <i className="bi bi-save me-1"></i>
-                Guardar Configuración
+                Guardar y Aplicar
               </>
             )}
           </Button>

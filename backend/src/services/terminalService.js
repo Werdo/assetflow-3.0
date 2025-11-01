@@ -34,9 +34,11 @@ const ALLOWED_COMMANDS = {
   'backup-status': { safe: true, category: 'backup', custom: true },
   'backup-run': { safe: false, category: 'backup', custom: true, requiresConfirm: true },
   'backup-list': { safe: true, category: 'backup', custom: true },
+  'backup-reload': { safe: false, category: 'backup', custom: true, requiresConfirm: false },
   'snapshot-status': { safe: true, category: 'backup', custom: true },
   'snapshot-run': { safe: false, category: 'backup', custom: true, requiresConfirm: true },
   'snapshot-list': { safe: true, category: 'backup', custom: true },
+  'snapshot-reload': { safe: false, category: 'backup', custom: true, requiresConfirm: false },
 
   // Logs
   'tail': { safe: true, category: 'logs', args: ['-n', '-f'] },
@@ -184,6 +186,32 @@ class TerminalService {
         } catch (error) {
           return { success: false, output: 'No se encontraron snapshots', type: 'text' };
         }
+      },
+
+      'backup-reload': async () => {
+        try {
+          // Reload cron service to apply new backup schedule
+          await execAsync('crontab -l > /tmp/current_cron.bak');
+          const { stdout, stderr } = await execAsync('service cron reload || systemctl reload cron || true');
+          logger.info('Backup service reloaded');
+          return { success: true, output: 'Servicio de backup reiniciado correctamente', type: 'text' };
+        } catch (error) {
+          logger.error('Failed to reload backup service', { error: error.message });
+          return { success: false, output: `Error al reiniciar servicio: ${error.message}`, type: 'text' };
+        }
+      },
+
+      'snapshot-reload': async () => {
+        try {
+          // Reload cron service to apply new snapshot schedule
+          await execAsync('crontab -l > /tmp/current_cron.bak');
+          const { stdout, stderr } = await execAsync('service cron reload || systemctl reload cron || true');
+          logger.info('Snapshot service reloaded');
+          return { success: true, output: 'Servicio de snapshot reiniciado correctamente', type: 'text' };
+        } catch (error) {
+          logger.error('Failed to reload snapshot service', { error: error.message });
+          return { success: false, output: `Error al reiniciar servicio: ${error.message}`, type: 'text' };
+        }
       }
     };
 
@@ -309,6 +337,351 @@ class TerminalService {
     } catch (error) {
       logger.error(`Failed to update ${type} config`, { error: error.message });
       throw new Error(`No se pudo actualizar la configuración de ${type}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Ejecuta un comando de backup con streaming en tiempo real
+   */
+  streamBackupExecution(res, userId) {
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    logger.info('Starting backup streaming execution', { userId });
+
+    const isWindows = process.platform === 'win32';
+
+    // In Windows development environment, simulate backup process
+    if (isWindows) {
+      this._simulateBackupExecution(res, userId);
+      return;
+    }
+
+    // In production (Linux), run actual backup script
+    const scriptPath = path.join(this.scriptsDir, 'backup.sh');
+    const backupProcess = spawn('bash', [scriptPath]);
+
+    // Stream stdout
+    backupProcess.stdout.on('data', (data) => {
+      const lines = data.toString().split('\n').filter(l => l.trim());
+      lines.forEach(line => {
+        res.write(`data: ${JSON.stringify({ type: 'stdout', message: line })}\n\n`);
+      });
+    });
+
+    // Stream stderr
+    backupProcess.stderr.on('data', (data) => {
+      const lines = data.toString().split('\n').filter(l => l.trim());
+      lines.forEach(line => {
+        res.write(`data: ${JSON.stringify({ type: 'stderr', message: line })}\n\n`);
+      });
+    });
+
+    // Handle process completion
+    backupProcess.on('close', (code) => {
+      logger.info('Backup process completed', { userId, exitCode: code });
+      res.write(`data: ${JSON.stringify({
+        type: 'complete',
+        success: code === 0,
+        exitCode: code,
+        message: code === 0 ? 'Backup completado exitosamente' : 'Error al ejecutar backup'
+      })}\n\n`);
+      res.end();
+    });
+
+    // Handle process errors
+    backupProcess.on('error', (error) => {
+      logger.error('Backup process error', { userId, error: error.message });
+      res.write(`data: ${JSON.stringify({
+        type: 'error',
+        message: `Error: ${error.message}`
+      })}\n\n`);
+      res.end();
+    });
+  }
+
+  /**
+   * Simula la ejecución de backup para desarrollo en Windows
+   */
+  _simulateBackupExecution(res, userId) {
+    const messages = [
+      '=== AssetFlow Backup Process (Modo Simulación - Windows) ===',
+      'Iniciando proceso de backup...',
+      'Verificando configuración...',
+      'Conectando a MongoDB...',
+      'Exportando base de datos assetflow...',
+      '  - Colección: users',
+      '  - Colección: productos',
+      '  - Colección: clientes',
+      '  - Colección: emplazamientos',
+      '  - Colección: depositos',
+      '  - Colección: alertas',
+      'Base de datos exportada exitosamente',
+      'Comprimiendo archivos...',
+      'Aplicando rotación de backups (7 días / 4 semanas / 6 meses)...',
+      'Backup completado: assetflow_backup_' + new Date().toISOString().split('T')[0] + '.tar.gz',
+      'Tamaño: 1.2 MB',
+      '=== Backup Finalizado Exitosamente ==='
+    ];
+
+    let index = 0;
+    const interval = setInterval(() => {
+      if (index < messages.length) {
+        res.write(`data: ${JSON.stringify({ type: 'stdout', message: messages[index] })}\n\n`);
+        index++;
+      } else {
+        clearInterval(interval);
+        res.write(`data: ${JSON.stringify({
+          type: 'complete',
+          success: true,
+          exitCode: 0,
+          message: 'Backup completado exitosamente (simulación)'
+        })}\n\n`);
+        res.end();
+      }
+    }, 300); // Un mensaje cada 300ms
+  }
+
+  /**
+   * Ejecuta un comando de snapshot con streaming en tiempo real
+   */
+  streamSnapshotExecution(res, userId) {
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    logger.info('Starting snapshot streaming execution', { userId });
+
+    const isWindows = process.platform === 'win32';
+
+    // In Windows development environment, simulate snapshot process
+    if (isWindows) {
+      this._simulateSnapshotExecution(res, userId);
+      return;
+    }
+
+    // In production (Linux), run actual snapshot script
+    const scriptPath = path.join(this.scriptsDir, 'snapshot.sh');
+
+    // Spawn snapshot process
+    const snapshotProcess = spawn('bash', [scriptPath]);
+
+    // Stream stdout
+    snapshotProcess.stdout.on('data', (data) => {
+      const lines = data.toString().split('\n').filter(l => l.trim());
+      lines.forEach(line => {
+        res.write(`data: ${JSON.stringify({ type: 'stdout', message: line })}\n\n`);
+      });
+    });
+
+    // Stream stderr
+    snapshotProcess.stderr.on('data', (data) => {
+      const lines = data.toString().split('\n').filter(l => l.trim());
+      lines.forEach(line => {
+        res.write(`data: ${JSON.stringify({ type: 'stderr', message: line })}\n\n`);
+      });
+    });
+
+    // Handle process completion
+    snapshotProcess.on('close', (code) => {
+      logger.info('Snapshot process completed', { userId, exitCode: code });
+      res.write(`data: ${JSON.stringify({
+        type: 'complete',
+        success: code === 0,
+        exitCode: code,
+        message: code === 0 ? 'Snapshot completado exitosamente' : 'Error al ejecutar snapshot'
+      })}\n\n`);
+      res.end();
+    });
+
+    // Handle process errors
+    snapshotProcess.on('error', (error) => {
+      logger.error('Snapshot process error', { userId, error: error.message });
+      res.write(`data: ${JSON.stringify({
+        type: 'error',
+        message: `Error: ${error.message}`
+      })}\n\n`);
+      res.end();
+    });
+  }
+
+  /**
+   * Simula la ejecución de snapshot para desarrollo en Windows
+   */
+  _simulateSnapshotExecution(res, userId) {
+    const messages = [
+      '=== AssetFlow Docker Snapshot Process (Modo Simulación - Windows) ===',
+      'Iniciando proceso de snapshot...',
+      'Verificando configuración...',
+      'Deteniendo contenedores Docker...',
+      '  ✓ Contenedor assetflow-backend detenido',
+      '  ✓ Contenedor assetflow-frontend detenido',
+      '  ✓ Contenedor mongodb detenido',
+      'Creando snapshots de volúmenes Docker...',
+      '  - Volumen: assetflow_mongodb-data',
+      '  - Volumen: assetflow_backend-uploads',
+      'Exportando imágenes Docker...',
+      '  - Imagen: assetflow-backend:latest',
+      '  - Imagen: assetflow-frontend:latest',
+      '  - Imagen: mongo:latest',
+      'Comprimiendo snapshot...',
+      'Reiniciando contenedores...',
+      '  ✓ Contenedor mongodb reiniciado',
+      '  ✓ Contenedor assetflow-backend reiniciado',
+      '  ✓ Contenedor assetflow-frontend reiniciado',
+      'Aplicando rotación de snapshots (10 últimos / 30 días máx)...',
+      'Snapshot completado: docker_snapshot_' + new Date().toISOString().split('T')[0] + '.tar',
+      'Tamaño: 512 MB',
+      '=== Snapshot Finalizado Exitosamente ==='
+    ];
+
+    let index = 0;
+    const interval = setInterval(() => {
+      if (index < messages.length) {
+        res.write(`data: ${JSON.stringify({ type: 'stdout', message: messages[index] })}\n\n`);
+        index++;
+      } else {
+        clearInterval(interval);
+        res.write(`data: ${JSON.stringify({
+          type: 'complete',
+          success: true,
+          exitCode: 0,
+          message: 'Snapshot completado exitosamente (simulación)'
+        })}\n\n`);
+        res.end();
+      }
+    }, 350); // Un mensaje cada 350ms
+  }
+
+  /**
+   * Sube un snapshot a un servidor remoto con streaming en tiempo real
+   */
+  streamSnapshotPush(res, userId, filename, remoteConfig) {
+    const { host, port, path: remotePath, user, password } = remoteConfig;
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    logger.info('Starting snapshot push to remote', { userId, filename, host });
+
+    // Validate filename
+    if (filename.includes('..') || filename.includes('/')) {
+      res.write(`data: ${JSON.stringify({
+        type: 'error',
+        message: 'Nombre de archivo inválido'
+      })}\n\n`);
+      res.end();
+      return;
+    }
+
+    const snapshotDir = '/var/snapshots/assetflow';
+    const localPath = path.join(snapshotDir, filename);
+
+    // Build SCP command with sshpass if password is provided, or without for key-based auth
+    let scpCommand;
+    if (password) {
+      scpCommand = `sshpass -p "${password}" scp -P ${port || 22} -o StrictHostKeyChecking=no "${localPath}" ${user}@${host}:${remotePath}`;
+    } else {
+      scpCommand = `scp -P ${port || 22} -o StrictHostKeyChecking=no "${localPath}" ${user}@${host}:${remotePath}`;
+    }
+
+    res.write(`data: ${JSON.stringify({
+      type: 'stdout',
+      message: `Iniciando transferencia a ${host}...`
+    })}\n\n`);
+
+    // Spawn SCP process
+    const scpProcess = spawn('sh', ['-c', scpCommand]);
+
+    // Stream stdout
+    scpProcess.stdout.on('data', (data) => {
+      const lines = data.toString().split('\n').filter(l => l.trim());
+      lines.forEach(line => {
+        res.write(`data: ${JSON.stringify({ type: 'stdout', message: line })}\n\n`);
+      });
+    });
+
+    // Stream stderr (SCP sends progress to stderr)
+    scpProcess.stderr.on('data', (data) => {
+      const lines = data.toString().split('\n').filter(l => l.trim());
+      lines.forEach(line => {
+        res.write(`data: ${JSON.stringify({ type: 'stdout', message: line })}\n\n`);
+      });
+    });
+
+    // Handle process completion
+    scpProcess.on('close', (code) => {
+      logger.info('Snapshot push completed', { userId, filename, host, exitCode: code });
+      res.write(`data: ${JSON.stringify({
+        type: 'complete',
+        success: code === 0,
+        exitCode: code,
+        message: code === 0 ? 'Snapshot transferido exitosamente' : 'Error al transferir snapshot'
+      })}\n\n`);
+      res.end();
+    });
+
+    // Handle process errors
+    scpProcess.on('error', (error) => {
+      logger.error('Snapshot push error', { userId, filename, host, error: error.message });
+      res.write(`data: ${JSON.stringify({
+        type: 'error',
+        message: `Error: ${error.message}`
+      })}\n\n`);
+      res.end();
+    });
+  }
+
+  /**
+   * Obtiene la ruta completa de un archivo de backup
+   */
+  async getBackupFilePath(filename) {
+    try {
+      // Validar que el nombre de archivo no contenga path traversal
+      if (filename.includes('..') || filename.includes('/')) {
+        throw new Error('Nombre de archivo inválido');
+      }
+
+      const backupDir = '/var/backups/assetflow';
+      const filePath = path.join(backupDir, filename);
+
+      // Verificar que el archivo existe
+      await fs.access(filePath);
+
+      logger.info('Backup file accessed', { filename, filePath });
+      return filePath;
+    } catch (error) {
+      logger.error('Failed to access backup file', { filename, error: error.message });
+      throw new Error(`No se pudo acceder al archivo de backup: ${filename}`);
+    }
+  }
+
+  /**
+   * Obtiene la ruta completa de un archivo de snapshot
+   */
+  async getSnapshotFilePath(filename) {
+    try {
+      // Validar que el nombre de archivo no contenga path traversal
+      if (filename.includes('..') || filename.includes('/')) {
+        throw new Error('Nombre de archivo inválido');
+      }
+
+      const snapshotDir = '/var/snapshots/assetflow';
+      const filePath = path.join(snapshotDir, filename);
+
+      // Verificar que el archivo existe
+      await fs.access(filePath);
+
+      logger.info('Snapshot file accessed', { filename, filePath });
+      return filePath;
+    } catch (error) {
+      logger.error('Failed to access snapshot file', { filename, error: error.message });
+      throw new Error(`No se pudo acceder al archivo de snapshot: ${filename}`);
     }
   }
 

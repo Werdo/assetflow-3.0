@@ -1,7 +1,7 @@
 {
   "name": "assetflow-backend",
-  "version": "3.5.0",
-  "description": "AssetFlow 3.5 - Backend API with Express + MongoDB",
+  "version": "3.5.1",
+  "description": "AssetFlow 3.5.1 - Backend API with Express + MongoDB",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

@@ -120,6 +120,15 @@ exports.updateConfig = asyncHandler(async (req, res) => {
 
   const result = await terminalService.updateConfig(type, config);
 
+  // Automatically reload the service after config update
+  try {
+    const reloadCommand = `${type}-reload`;
+    await terminalService.executeCommand(reloadCommand, req.user.id);
+    logger.info(`${type} service reloaded after config update`);
+  } catch (error) {
+    logger.warn(`Failed to reload ${type} service`, { error: error.message });
+  }
+
   logger.info(`${type} configuration updated`, {
     userId: req.user.id,
     userName: req.user.name,
@@ -131,5 +140,143 @@ exports.updateConfig = asyncHandler(async (req, res) => {
     data: result
   });
 });
+
+/**
+ * @desc    Descargar archivo de backup
+ * @route   GET /api/admin/backups/download/:filename
+ * @access  Private (Admin only)
+ */
+exports.downloadBackup = asyncHandler(async (req, res) => {
+  const { filename } = req.params;
+
+  if (!filename || typeof filename !== 'string') {
+    throw new ValidationError('Nombre de archivo requerido');
+  }
+
+  const filePath = await terminalService.getBackupFilePath(filename);
+
+  logger.info('Backup file download', {
+    filename,
+    userId: req.user.id,
+    userName: req.user.name
+  });
+
+  // Set headers for file download
+  res.setHeader('Content-Type', 'application/gzip');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+  // Stream file to response
+  const fs = require('fs');
+  const fileStream = fs.createReadStream(filePath);
+
+  fileStream.on('error', (error) => {
+    logger.error('Error streaming backup file', { filename, error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error al descargar el archivo'
+    });
+  });
+
+  fileStream.pipe(res);
+});
+
+/**
+ * @desc    Descargar archivo de snapshot
+ * @route   GET /api/admin/snapshots/download/:filename
+ * @access  Private (Admin only)
+ */
+exports.downloadSnapshot = asyncHandler(async (req, res) => {
+  const { filename } = req.params;
+
+  if (!filename || typeof filename !== 'string') {
+    throw new ValidationError('Nombre de archivo requerido');
+  }
+
+  const filePath = await terminalService.getSnapshotFilePath(filename);
+
+  logger.info('Snapshot file download', {
+    filename,
+    userId: req.user.id,
+    userName: req.user.name
+  });
+
+  // Set headers for file download
+  res.setHeader('Content-Type', 'application/gzip');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+  // Stream file to response
+  const fs = require('fs');
+  const fileStream = fs.createReadStream(filePath);
+
+  fileStream.on('error', (error) => {
+    logger.error('Error streaming snapshot file', { filename, error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error al descargar el archivo'
+    });
+  });
+
+  fileStream.pipe(res);
+});
+
+/**
+ * @desc    Ejecutar backup con streaming en tiempo real
+ * @route   POST /api/admin/backups/execute-stream
+ * @access  Private (Admin only)
+ */
+exports.executeBackupStream = (req, res) => {
+  logger.info('Backup streaming execution requested', {
+    userId: req.user.id,
+    userName: req.user.name
+  });
+
+  terminalService.streamBackupExecution(res, req.user.id);
+};
+
+/**
+ * @desc    Ejecutar snapshot con streaming en tiempo real
+ * @route   POST /api/admin/snapshots/execute-stream
+ * @access  Private (Admin only)
+ */
+exports.executeSnapshotStream = (req, res) => {
+  logger.info('Snapshot streaming execution requested', {
+    userId: req.user.id,
+    userName: req.user.name
+  });
+
+  terminalService.streamSnapshotExecution(res, req.user.id);
+};
+
+/**
+ * @desc    Subir snapshot a servidor remoto con streaming
+ * @route   POST /api/admin/snapshots/push-remote
+ * @access  Private (Admin only)
+ */
+exports.pushSnapshotToRemote = (req, res) => {
+  const { filename, remoteConfig } = req.body;
+
+  if (!filename || typeof filename !== 'string') {
+    return res.status(400).json({
+      success: false,
+      message: 'Nombre de archivo requerido'
+    });
+  }
+
+  if (!remoteConfig || !remoteConfig.host || !remoteConfig.user || !remoteConfig.path) {
+    return res.status(400).json({
+      success: false,
+      message: 'Configuración del servidor remoto incompleta'
+    });
+  }
+
+  logger.info('Snapshot push to remote requested', {
+    userId: req.user.id,
+    userName: req.user.name,
+    filename,
+    remoteHost: remoteConfig.host
+  });
+
+  terminalService.streamSnapshotPush(res, req.user.id, filename, remoteConfig);
+};
 
 module.exports = exports;

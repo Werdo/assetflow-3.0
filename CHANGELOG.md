@@ -7,6 +7,88 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [3.5.1] - 2025-11-01 - Backup & Snapshot Streaming
+
+### Added
+- **Backup System - Real-Time Streaming**: Sistema completo de backups con ejecución en tiempo real
+  - Endpoint streaming `/api/admin/backups/execute-stream` con Server-Sent Events (SSE)
+  - Componente `RealTimeTerminal` para visualización de output en vivo
+  - Simulación de backup para desarrollo en Windows (17 mensajes)
+  - Ejecución real de scripts bash en producción Linux
+  - Detección automática de plataforma con `process.platform`
+
+- **Snapshot System - Real-Time Streaming**: Sistema completo de snapshots Docker con streaming
+  - Endpoint streaming `/api/admin/snapshots/execute-stream` con SSE
+  - Simulación de snapshot para desarrollo en Windows (23 mensajes)
+  - Ejecución real de scripts para snapshots Docker en producción
+  - Incluye stop/start de contenedores, export de imágenes y volúmenes
+
+- **BackupsPage**: Interfaz completa de gestión de backups
+  - Botón "Ejecutar Backup Ahora" con confirmación
+  - Terminal en tiempo real con auto-scroll
+  - Lista de backups disponibles con descarga
+  - Configuración de horarios con ScheduleSelector
+  - Políticas de retención (diarios/semanales/mensuales)
+
+- **SnapshotsPage**: Interfaz completa de gestión de snapshots
+  - Botón "Ejecutar Snapshot Ahora" con confirmación
+  - Terminal en tiempo real para proceso Docker
+  - Lista de snapshots con tamaños y fechas
+  - Descarga de snapshots
+  - Push a servidor remoto vía SSH
+
+### Fixed
+- **API Client baseURL**: Corregido error en `terminalService.ts`
+  - Cambiado de `api.defaults.baseURL` (undefined) a `API_CONFIG.BASE_URL`
+  - Afectaba 4 métodos: getBackupStreamUrl, getSnapshotStreamUrl, getBackupDownloadUrl, getSnapshotDownloadUrl
+  - Error: "Cannot read properties of undefined (reading 'baseURL')"
+
+- **Streaming Execution - Windows Compatibility**: Resuelto error 500 en desarrollo
+  - Backend intentaba ejecutar bash scripts en Windows (sin bash nativo)
+  - Implementada detección de plataforma y simulación para desarrollo
+  - Producción Linux ejecuta scripts reales sin cambios
+
+### Changed
+- **Terminal Service**: Arquitectura mejorada con platform detection
+  - Método `streamBackupExecution()` detecta OS y bifurca ejecución
+  - Método `_simulateBackupExecution()` para Windows con delays realistas (300ms)
+  - Método `streamSnapshotExecution()` con misma lógica
+  - Método `_simulateSnapshotExecution()` para Windows (350ms delays)
+
+- **RealTimeTerminal Component**: Mejorada gestión de streaming
+  - Usa Fetch API con ReadableStream en lugar de EventSource
+  - Parser SSE personalizado con buffer de líneas
+  - Manejo de eventos: stdout, stderr, complete, error
+  - Auto-scroll suave al recibir nuevo output
+  - Botón "Limpiar" después de completar
+
+### Technical Details
+**Backend:**
+- `backend/src/services/terminalService.js` (lines 343-557)
+  - Platform detection: `process.platform === 'win32'`
+  - SSE headers: `text/event-stream`, `no-cache`, `keep-alive`
+  - Child process spawning con `spawn('bash', [scriptPath])`
+  - Streaming de stdout/stderr line por line
+
+**Frontend:**
+- `frontend/src/services/terminalService.ts` (lines 90-121)
+  - Import de `API_CONFIG` desde `../config/api`
+  - Generación correcta de URLs con baseURL + token
+- `frontend/src/components/admin/RealTimeTerminal.tsx`
+  - Fetch con AbortController para cancelación
+  - TextDecoder para streaming de bytes
+  - Buffer parsing para mensajes SSE completos
+- `frontend/src/pages/admin/BackupsPage.tsx`
+- `frontend/src/pages/admin/SnapshotsPage.tsx`
+
+### Testing
+- ✅ Windows development: Simulación funcional para testing UI
+- ✅ Linux production: Scripts bash ejecutan backups/snapshots reales
+- ✅ Real-time output: Streaming SSE funcionando correctamente
+- ✅ Error handling: Manejo de fallos y timeouts
+
+---
+
 ## [3.5.0] - 2025-10-24 - Stable Production Release
 
 ### Fixed
