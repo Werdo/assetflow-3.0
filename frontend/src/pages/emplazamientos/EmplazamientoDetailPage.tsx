@@ -11,7 +11,7 @@ import { Icon } from 'leaflet';
 import toast from 'react-hot-toast';
 import emplazamientoService from '../../services/emplazamientoService';
 import depositoService from '../../services/depositoService';
-import type { Emplazamiento, Deposito, EmplazamientoEstadisticas, Cliente, Producto } from '../../types';
+import type { Emplazamiento, Deposito, EmplazamientoEstadisticas } from '../../types';
 import 'leaflet/dist/leaflet.css';
 
 // Icon para el marcador del emplazamiento
