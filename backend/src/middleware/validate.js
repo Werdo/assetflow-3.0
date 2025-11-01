@@ -102,6 +102,12 @@ const validateCliente = [
     .notEmpty().withMessage('El CIF es requerido')
     .toUpperCase(),
 
+  // Accept both flat structure (email field) and nested structure (contacto.email)
+  body('email')
+    .optional()
+    .isEmail().withMessage('Email de contacto inválido')
+    .normalizeEmail(),
+
   body('contacto.email')
     .optional()
     .isEmail().withMessage('Email de contacto inválido')
