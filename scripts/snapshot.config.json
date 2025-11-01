@@ -13,7 +13,7 @@
       "includeVolumes": false
     },
     {
-      "name": "mongodb",
+      "name": "assetflow-mongodb",
       "enabled": true,
       "includeVolumes": true
     }
