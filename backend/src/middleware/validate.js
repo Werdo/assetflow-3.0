@@ -144,12 +144,12 @@ const validateCliente = [
 
   // Accept both flat structure (email field) and nested structure (contacto.email)
   body('email')
-    .optional()
+    .optional({ checkFalsy: true })
     .isEmail().withMessage('Email de contacto inválido')
     .normalizeEmail(),
 
   body('contacto.email')
-    .optional()
+    .optional({ checkFalsy: true })
     .isEmail().withMessage('Email de contacto inválido')
     .normalizeEmail(),
 
@@ -184,7 +184,7 @@ const validateEmplazamiento = [
     }),
 
   body('contacto.email')
-    .optional()
+    .optional({ checkFalsy: true })
     .isEmail().withMessage('Email de contacto inválido')
     .normalizeEmail(),
 
