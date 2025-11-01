@@ -14,8 +14,8 @@ const getEncryptionKey = () => {
     throw new Error('ENCRYPTION_KEY no está configurada en variables de entorno');
   }
 
-  if (key.length !== 32) {
-    throw new Error('ENCRYPTION_KEY debe tener 32 caracteres (256 bits)');
+  if (key.length !== 64) {
+    throw new Error('ENCRYPTION_KEY debe tener 64 caracteres hexadecimales (256 bits)');
   }
 
   return Buffer.from(key, 'hex');
