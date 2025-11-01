@@ -361,7 +361,7 @@ class TerminalService {
 
     // In production (Linux), run actual backup script
     const scriptPath = path.join(this.scriptsDir, 'backup.sh');
-    const backupProcess = spawn('bash', [scriptPath]);
+    const backupProcess = spawn('sh', [scriptPath]);
 
     // Stream stdout
     backupProcess.stdout.on('data', (data) => {
@@ -467,7 +467,7 @@ class TerminalService {
     const scriptPath = path.join(this.scriptsDir, 'snapshot.sh');
 
     // Spawn snapshot process
-    const snapshotProcess = spawn('bash', [scriptPath]);
+    const snapshotProcess = spawn('sh', [scriptPath]);
 
     // Stream stdout
     snapshotProcess.stdout.on('data', (data) => {
