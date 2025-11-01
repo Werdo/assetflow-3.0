@@ -90,6 +90,8 @@ const validateProducto = [
 
 /**
  * Validaciones para clientes
+ * Si es SUBCLIENTE: solo nombre y clientePrincipal son obligatorios
+ * Si es CLIENTE: nombre, CIF y contacto son obligatorios
  */
 const validateCliente = [
   body('nombre')
@@ -97,10 +99,47 @@ const validateCliente = [
     .notEmpty().withMessage('El nombre es requerido')
     .isLength({ min: 2, max: 200 }).withMessage('El nombre debe tener entre 2 y 200 caracteres'),
 
+  // CIF solo obligatorio si NO es subcliente
   body('cif')
     .trim()
-    .notEmpty().withMessage('El CIF es requerido')
+    .custom((value, { req }) => {
+      // Si es subcliente, CIF es opcional
+      if (req.body.esSubcliente === true) {
+        return true;
+      }
+      // Si es cliente principal, CIF es obligatorio
+      if (!value || value.trim() === '') {
+        throw new Error('El CIF es requerido para clientes principales');
+      }
+      return true;
+    })
     .toUpperCase(),
+
+  // Contacto obligatorio solo si NO es subcliente
+  body('contacto')
+    .custom((value, { req }) => {
+      // Si es subcliente, contacto es opcional
+      if (req.body.esSubcliente === true) {
+        return true;
+      }
+      // Si es cliente principal, contacto es obligatorio
+      if (!value || value.trim() === '') {
+        throw new Error('El contacto es requerido para clientes principales');
+      }
+      return true;
+    }),
+
+  // Cliente principal obligatorio si es subcliente
+  body('clientePrincipal')
+    .custom((value, { req }) => {
+      // Si es subcliente, clientePrincipal es obligatorio
+      if (req.body.esSubcliente === true) {
+        if (!value || value.trim() === '') {
+          throw new Error('El cliente principal es requerido para subclientes');
+        }
+      }
+      return true;
+    }),
 
   // Accept both flat structure (email field) and nested structure (contacto.email)
   body('email')
