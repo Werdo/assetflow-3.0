@@ -249,9 +249,6 @@ export const SnapshotsPage: React.FC = () => {
                       <td className="fw-semibold">Horario</td>
                       <td>
                         <code>{config.schedule}</code>
-                        <span className="ms-2 text-muted small">
-                          (diario a las {cronToSchedule(config.schedule).hour}:{cronToSchedule(config.schedule).minute})
-                        </span>
                       </td>
                     </tr>
                     <tr>
