@@ -117,13 +117,31 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
                          (filterEstado === 'activo' && (estado === 'verde' || estado === 'normal')) ||
                          (filterEstado === 'inactivo' && (estado === 'rojo' || estado === 'critico' || estado === 'amarillo'));
 
-    // Filtro por cliente
-    const clienteId = typeof e.cliente === 'string' ? e.cliente : e.cliente?._id;
-    const matchesCliente = filterCliente === 'all' || clienteId === filterCliente;
+    // Filtro por cliente: incluir emplazamientos del cliente Y de sus subclientes
+    let matchesCliente = filterCliente === 'all';
+    if (!matchesCliente && filterCliente !== 'all') {
+      const clienteId = typeof e.cliente === 'string' ? e.cliente : e.cliente?._id;
+      const subclienteId = typeof (e as any).subcliente === 'string' ? (e as any).subcliente : (e as any).subcliente?._id;
 
-    // Filtro por subcliente
-    const subclienteId = (e as any).subcliente ? (typeof (e as any).subcliente === 'string' ? (e as any).subcliente : (e as any).subcliente._id) : null;
-    const matchesSubcliente = filterSubcliente === 'all' || subclienteId === filterSubcliente;
+      // Match si el cliente es el seleccionado
+      matchesCliente = clienteId === filterCliente;
+
+      // O si el subcliente pertenece al cliente seleccionado
+      if (!matchesCliente && subclienteId) {
+        const subcliente = clientes.find(c => c._id === subclienteId);
+        const clientePrincipalId = typeof subcliente?.clientePrincipal === 'string'
+          ? subcliente.clientePrincipal
+          : subcliente?.clientePrincipal?._id;
+        matchesCliente = clientePrincipalId === filterCliente;
+      }
+    }
+
+    // Filtro por subcliente: solo emplazamientos de ese subcliente específico
+    let matchesSubcliente = filterSubcliente === 'all';
+    if (!matchesSubcliente && filterSubcliente !== 'all') {
+      const subclienteId = typeof (e as any).subcliente === 'string' ? (e as any).subcliente : (e as any).subcliente?._id;
+      matchesSubcliente = subclienteId === filterSubcliente;
+    }
 
     // Filtro por valor total
     const valor = e.valorTotal || 0;
