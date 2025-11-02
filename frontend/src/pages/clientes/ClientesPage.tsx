@@ -205,6 +205,7 @@ export const ClientesPage = () => {
                         <th>Código</th>
                         <th>Nombre</th>
                         <th>CIF</th>
+                        <th>Dirección Fiscal</th>
                         <th>Ciudad</th>
                         <th>Teléfono</th>
                         <th>Email</th>
@@ -218,6 +219,11 @@ export const ClientesPage = () => {
                           <td><code>{cliente.codigo}</code></td>
                           <td><strong>{cliente.nombre}</strong></td>
                           <td>{cliente.cif || '-'}</td>
+                          <td>
+                            <small className="text-muted">
+                              {cliente.direccionFiscal || '-'}
+                            </small>
+                          </td>
                           <td>{cliente.ciudad || '-'}</td>
                           <td>{cliente.telefono || '-'}</td>
                           <td>{cliente.email || '-'}</td>
