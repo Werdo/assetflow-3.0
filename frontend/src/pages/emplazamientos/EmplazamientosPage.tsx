@@ -274,9 +274,24 @@ export const EmplazamientosPage = () => {
     // Filtro por estado
     const matchesEstado = filterEstado === 'all' || e.estado === filterEstado;
 
-    // Filtro por cliente
-    const matchesCliente = filterCliente === 'all' ||
-                          (typeof e.cliente === 'string' ? e.cliente === filterCliente : e.cliente._id === filterCliente);
+    // Filtro por cliente: incluir emplazamientos del cliente Y de sus subclientes
+    let matchesCliente = filterCliente === 'all';
+    if (!matchesCliente && filterCliente !== 'all') {
+      const clienteId = typeof e.cliente === 'string' ? e.cliente : e.cliente?._id;
+      const subclienteId = typeof e.subcliente === 'string' ? e.subcliente : e.subcliente?._id;
+
+      // Match si el cliente es el seleccionado
+      matchesCliente = clienteId === filterCliente;
+
+      // O si el subcliente pertenece al cliente seleccionado
+      if (!matchesCliente && subclienteId) {
+        const subcliente = clientes.find(c => c._id === subclienteId);
+        const clientePrincipalId = typeof subcliente?.clientePrincipal === 'string'
+          ? subcliente.clientePrincipal
+          : subcliente?.clientePrincipal?._id;
+        matchesCliente = clientePrincipalId === filterCliente;
+      }
+    }
 
     // Filtro por subcliente
     const matchesSubcliente = filterSubcliente === 'all' ||

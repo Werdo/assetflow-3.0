@@ -15,13 +15,23 @@ exports.getEmplazamientos = asyncHandler(async (req, res) => {
   const query = {};
 
   if (cliente) {
-    query.cliente = cliente;
+    // Find all subclientes of this cliente
+    const subclientes = await Cliente.find({ clientePrincipal: cliente }).select('_id');
+    const subclienteIds = subclientes.map(s => s._id);
+
+    // Filter by cliente OR subcliente that belongs to this cliente
+    query.$or = [
+      { cliente: cliente },
+      { subcliente: { $in: subclienteIds } }
+    ];
   }
 
   if (subcliente !== undefined) {
     if (subcliente === 'null' || subcliente === '') {
       query.subcliente = null;
     } else {
+      // Remove the $or from cliente filter if subcliente is specified
+      delete query.$or;
       query.subcliente = subcliente;
     }
   }
