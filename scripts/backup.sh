@@ -73,10 +73,10 @@ else
     exit 1
 fi
 
-# Cleanup old backups (keep last 7)
-log_info "Cleaning up old backups (keeping last 7)..."
+# Cleanup old backups (keep last 4 - 3 old + 1 current)
+log_info "Cleaning up old backups (keeping last 4)..."
 cd "$BACKUP_DIR"
-ls -t mongodb_*.tar.gz 2>/dev/null | tail -n +8 | xargs -r rm -f
+ls -t mongodb_*.tar.gz 2>/dev/null | tail -n +5 | xargs -r rm -f
 log_info "Old backups cleaned up"
 
 # List current backups

@@ -55,7 +55,7 @@ log_info "===== AssetFlow Container Snapshot Started ====="
 
 # Get configuration
 SNAPSHOT_DIR=$(read_config '.destination.path')
-RETENTION_COUNT=$(read_config '.retention.count')
+RETENTION_COUNT=4  # Fixed: Keep only 4 snapshots (3 old + 1 current)
 RETENTION_DAYS=$(read_config '.retention.maxAgeDays')
 AUTO_CLEANUP=$(read_config '.autoCleanup')
 
@@ -162,21 +162,29 @@ log_info "Snapshot summary: $success_count successful, $failed_count failed"
 if [ "$AUTO_CLEANUP" == "true" ]; then
     log_info "Cleaning up old snapshots..."
 
-    # Remove by count
-    if [ "$RETENTION_COUNT" -gt 0 ]; then
-        log_info "Keeping only last $RETENTION_COUNT snapshots per container"
+    # Remove by count - keep only 4 snapshots (3 old + 1 current)
+    log_info "Keeping only last 4 snapshots per container"
 
-        for container_name in $(jq -r '.containers[].name' "$CONFIG_FILE"); do
+    for container_name in $(jq -r '.containers[].name' "$CONFIG_FILE"); do
+        # Count existing snapshots
+        snapshot_count=$(find "$SNAPSHOT_DIR" -name "${container_name}_*.tar.gz" -type f | wc -l)
+
+        if [ "$snapshot_count" -gt 4 ]; then
+            log_info "Removing old snapshots for $container_name (found $snapshot_count, keeping 4)"
+
+            # Remove .tar.gz files beyond the 4 most recent
             find "$SNAPSHOT_DIR" -name "${container_name}_*.tar.gz" -type f | \
-                sort -r | tail -n +$((RETENTION_COUNT + 1)) | xargs -r rm -f
+                sort -r | tail -n +5 | xargs -r rm -f
 
+            # Remove corresponding volume directories
             find "$SNAPSHOT_DIR" -name "${container_name}_*_volumes" -type d | \
-                sort -r | tail -n +$((RETENTION_COUNT + 1)) | xargs -r rm -rf
+                sort -r | tail -n +5 | xargs -r rm -rf
 
+            # Remove corresponding metadata files
             find "$SNAPSHOT_DIR" -name "${container_name}_*_metadata.json" -type f | \
-                sort -r | tail -n +$((RETENTION_COUNT + 1)) | xargs -r rm -f
-        done
-    fi
+                sort -r | tail -n +5 | xargs -r rm -f
+        fi
+    done
 
     # Remove by age
     if [ "$RETENTION_DAYS" -gt 0 ]; then

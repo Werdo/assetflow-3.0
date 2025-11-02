@@ -134,6 +134,21 @@ export const SnapshotsPage: React.FC = () => {
     window.open(downloadUrl, '_blank');
   };
 
+  const handleDelete = async (filename: string) => {
+    if (!confirm(`¿Está seguro de que desea eliminar el snapshot "${filename}"? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      await terminalService.deleteSnapshot(filename);
+      toast.success('Snapshot eliminado exitosamente');
+      await loadSnapshotsList();
+    } catch (error: any) {
+      console.error('Error deleting snapshot:', error);
+      toast.error('Error al eliminar el snapshot');
+    }
+  };
+
   const handleShowPushModal = (filename: string) => {
     setSelectedSnapshot(filename);
     setShowPushModal(true);
@@ -378,10 +393,20 @@ export const SnapshotsPage: React.FC = () => {
                             <Button
                               variant="outline-primary"
                               size="sm"
+                              className="me-2"
                               onClick={() => handleShowPushModal(getFilenameFromPath(snapshot.path))}
                             >
                               <i className="bi bi-cloud-upload me-1"></i>
                               Subir
+                            </Button>
+                            <Button
+                              variant="outline-danger"
+                              size="sm"
+                              onClick={() => handleDelete(getFilenameFromPath(snapshot.path))}
+                              disabled={loading || executing}
+                            >
+                              <i className="bi bi-trash me-1"></i>
+                              Eliminar
                             </Button>
                           </td>
                         </tr>

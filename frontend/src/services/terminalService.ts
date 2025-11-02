@@ -135,6 +135,20 @@ class TerminalService {
       remoteConfig
     });
   }
+
+  /**
+   * Delete a backup file
+   */
+  async deleteBackup(filename: string): Promise<any> {
+    return await api.delete(`/admin/backups/delete/${encodeURIComponent(filename)}`);
+  }
+
+  /**
+   * Delete a snapshot file
+   */
+  async deleteSnapshot(filename: string): Promise<any> {
+    return await api.delete(`/admin/snapshots/delete/${encodeURIComponent(filename)}`);
+  }
 }
 
 export default new TerminalService();

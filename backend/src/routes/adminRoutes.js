@@ -31,6 +31,10 @@ router.put('/terminal/config/:type', protect, isAdmin, terminalController.update
 router.get('/backups/download/:filename', protectDownload, isAdmin, terminalController.downloadBackup);
 router.get('/snapshots/download/:filename', protectDownload, isAdmin, terminalController.downloadSnapshot);
 
+// Delete Routes - require standard auth
+router.delete('/backups/delete/:filename', protect, isAdmin, terminalController.deleteBackup);
+router.delete('/snapshots/delete/:filename', protect, isAdmin, terminalController.deleteSnapshot);
+
 // Streaming Execution Routes - require standard auth
 router.post('/backups/execute-stream', protect, isAdmin, terminalController.executeBackupStream);
 router.post('/snapshots/execute-stream', protect, isAdmin, terminalController.executeSnapshotStream);

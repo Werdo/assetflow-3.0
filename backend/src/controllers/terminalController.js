@@ -279,4 +279,86 @@ exports.pushSnapshotToRemote = (req, res) => {
   terminalService.streamSnapshotPush(res, req.user.id, filename, remoteConfig);
 };
 
+/**
+ * @desc    Eliminar archivo de backup
+ * @route   DELETE /api/admin/backups/delete/:filename
+ * @access  Private (Admin only)
+ */
+exports.deleteBackup = asyncHandler(async (req, res) => {
+  const { filename } = req.params;
+
+  if (!filename || typeof filename !== 'string') {
+    throw new ValidationError('Nombre de archivo requerido');
+  }
+
+  // Validate filename to prevent path traversal attacks
+  if (filename.includes('/') || filename.includes('..') || filename.includes('\\')) {
+    throw new ValidationError('Nombre de archivo inválido');
+  }
+
+  const fs = require('fs');
+  const path = require('path');
+  const backupPath = path.join('/backup', filename);
+
+  // Check if file exists
+  if (!fs.existsSync(backupPath)) {
+    throw new ValidationError('Archivo de backup no encontrado');
+  }
+
+  // Delete the file
+  fs.unlinkSync(backupPath);
+
+  logger.info('Backup file deleted', {
+    filename,
+    userId: req.user.id,
+    userName: req.user.name
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Backup eliminado exitosamente'
+  });
+});
+
+/**
+ * @desc    Eliminar archivo de snapshot
+ * @route   DELETE /api/admin/snapshots/delete/:filename
+ * @access  Private (Admin only)
+ */
+exports.deleteSnapshot = asyncHandler(async (req, res) => {
+  const { filename } = req.params;
+
+  if (!filename || typeof filename !== 'string') {
+    throw new ValidationError('Nombre de archivo requerido');
+  }
+
+  // Validate filename to prevent path traversal attacks
+  if (filename.includes('/') || filename.includes('..') || filename.includes('\\')) {
+    throw new ValidationError('Nombre de archivo inválido');
+  }
+
+  const fs = require('fs');
+  const path = require('path');
+  const snapshotPath = path.join('/snapshots', filename);
+
+  // Check if file exists
+  if (!fs.existsSync(snapshotPath)) {
+    throw new ValidationError('Archivo de snapshot no encontrado');
+  }
+
+  // Delete the file
+  fs.unlinkSync(snapshotPath);
+
+  logger.info('Snapshot file deleted', {
+    filename,
+    userId: req.user.id,
+    userName: req.user.name
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Snapshot eliminado exitosamente'
+  });
+});
+
 module.exports = exports;

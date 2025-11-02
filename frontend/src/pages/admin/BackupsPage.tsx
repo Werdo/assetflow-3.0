@@ -154,6 +154,21 @@ export const BackupsPage: React.FC = () => {
     window.open(downloadUrl, '_blank');
   };
 
+  const handleDelete = async (filename: string) => {
+    if (!confirm(`¿Está seguro de que desea eliminar el backup "${filename}"? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      await terminalService.deleteBackup(filename);
+      toast.success('Backup eliminado exitosamente');
+      await loadBackupsList();
+    } catch (error: any) {
+      console.error('Error deleting backup:', error);
+      toast.error('Error al eliminar el backup');
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('es-ES');
   };
@@ -365,10 +380,20 @@ export const BackupsPage: React.FC = () => {
                             <Button
                               variant="outline-success"
                               size="sm"
+                              className="me-2"
                               onClick={() => handleDownload(getFilenameFromPath(backup.path))}
                             >
                               <i className="bi bi-download me-1"></i>
                               Descargar
+                            </Button>
+                            <Button
+                              variant="outline-danger"
+                              size="sm"
+                              onClick={() => handleDelete(getFilenameFromPath(backup.path))}
+                              disabled={loading || executing}
+                            >
+                              <i className="bi bi-trash me-1"></i>
+                              Eliminar
                             </Button>
                           </td>
                         </tr>
