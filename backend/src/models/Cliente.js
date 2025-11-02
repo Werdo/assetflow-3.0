@@ -178,8 +178,16 @@ clienteSchema.methods.toPublicJSON = function() {
     codigo: this.codigo,
     nombre: this.nombre,
     cif: this.cif,
-    direccion: this.direccion,
-    contacto: this.contacto,
+    // Flat fields for frontend compatibility
+    direccionFiscal: this.direccion?.calle || '',
+    ciudad: this.direccion?.ciudad || '',
+    provincia: this.direccion?.provincia || '',
+    codigoPostal: this.direccion?.codigoPostal || '',
+    pais: this.direccion?.pais || '',
+    telefono: this.contacto?.telefono || '',
+    email: this.contacto?.email || '',
+    contacto: this.contacto?.nombre || '',
+    // Other fields
     activo: this.activo,
     esSubcliente: this.esSubcliente,
     clientePrincipal: this.clientePrincipal,
