@@ -4,9 +4,10 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Card, Spinner, Alert, Button } from 'react-bootstrap';
+import { Card, Spinner, Alert, Button, Row, Col, Form, InputGroup } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
-import type { EmplazamientoMapData } from '../../types';
+import clienteService from '../../services/clienteService';
+import type { EmplazamientoMapData, Cliente } from '../../types';
 
 interface RobustMapViewProps {
   emplazamientos: EmplazamientoMapData[];
@@ -28,6 +29,20 @@ export const RobustMapView: React.FC<RobustMapViewProps> = ({
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapLoading, setMapLoading] = useState(true);
   const [leafletLoaded, setLeafletLoaded] = useState(false);
+
+  // Clientes para filtros
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+
+  // Filtros
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterEstado, setFilterEstado] = useState<string>('all');
+  const [filterCliente, setFilterCliente] = useState<string>('all');
+  const [filterSubcliente, setFilterSubcliente] = useState<string>('all');
+  const [filterValorMin, setFilterValorMin] = useState<string>('');
+  const [filterValorMax, setFilterValorMax] = useState<string>('');
+  const [filterDepositosMin, setFilterDepositosMin] = useState<string>('');
+  const [filterDepositosMax, setFilterDepositosMax] = useState<string>('');
+  const [filterDiasMin, setFilterDiasMin] = useState<string>('');
 
   // Cargar Leaflet dinámicamente
   useEffect(() => {
@@ -59,9 +74,64 @@ export const RobustMapView: React.FC<RobustMapViewProps> = ({
     loadLeaflet();
   }, []);
 
+  // Cargar clientes al montar
+  useEffect(() => {
+    const cargarClientes = async () => {
+      try {
+        const response = await clienteService.getAll({ limit: 1000 });
+        setClientes(response.clientes);
+      } catch (error) {
+        console.error('Error cargando clientes:', error);
+      }
+    };
+    cargarClientes();
+  }, []);
+
+  // Obtener subclientes disponibles
+  const subclientes = clientes.filter(c => c.esSubcliente);
+
+  // Filtrado
+  const emplazamientosFiltrados = emplazamientos.filter((e) => {
+    // Búsqueda por texto
+    const matchesSearch = searchTerm === '' ||
+                         e.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         e.ciudad?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Filtro por estado - convertir estados del dashboard a formato comparable
+    const estado = e.estado?.toLowerCase() || 'verde';
+    const matchesEstado = filterEstado === 'all' ||
+                         (filterEstado === 'activo' && (estado === 'verde' || estado === 'normal')) ||
+                         (filterEstado === 'inactivo' && (estado === 'rojo' || estado === 'critico' || estado === 'amarillo'));
+
+    // Filtro por cliente
+    const clienteId = typeof e.cliente === 'string' ? e.cliente : e.cliente?._id;
+    const matchesCliente = filterCliente === 'all' || clienteId === filterCliente;
+
+    // Filtro por subcliente
+    const subclienteId = (e as any).subcliente ? (typeof (e as any).subcliente === 'string' ? (e as any).subcliente : (e as any).subcliente._id) : null;
+    const matchesSubcliente = filterSubcliente === 'all' || subclienteId === filterSubcliente;
+
+    // Filtro por valor total
+    const valor = e.valorTotal || 0;
+    const matchesValorMin = filterValorMin === '' || valor >= parseFloat(filterValorMin);
+    const matchesValorMax = filterValorMax === '' || valor <= parseFloat(filterValorMax);
+
+    // Filtro por depósitos activos
+    const depositos = e.depositosActivos || 0;
+    const matchesDepositosMin = filterDepositosMin === '' || depositos >= parseInt(filterDepositosMin);
+    const matchesDepositosMax = filterDepositosMax === '' || depositos <= parseInt(filterDepositosMax);
+
+    // Filtro por días mínimos
+    const diasMin = (e as any).diasMinimosRestantes;
+    const matchesDiasMin = filterDiasMin === '' || (diasMin !== null && diasMin !== undefined && diasMin >= parseInt(filterDiasMin));
+
+    return matchesSearch && matchesEstado && matchesCliente && matchesSubcliente &&
+           matchesValorMin && matchesValorMax && matchesDepositosMin && matchesDepositosMax && matchesDiasMin;
+  });
+
   // Inicializar mapa cuando Leaflet esté cargado
   useEffect(() => {
-    if (!leafletLoaded || !mapContainerRef.current || emplazamientos.length === 0) {
+    if (!leafletLoaded || !mapContainerRef.current || emplazamientosFiltrados.length === 0) {
       return;
     }
 
@@ -90,9 +160,9 @@ export const RobustMapView: React.FC<RobustMapViewProps> = ({
         // Añadir marcadores
         const bounds: [number, number][] = [];
 
-        console.log(`[RobustMapView] Añadiendo ${emplazamientos.length} emplazamientos al mapa`);
+        console.log(`[RobustMapView] Añadiendo ${emplazamientosFiltrados.length} emplazamientos al mapa (${emplazamientos.length} total)`);
 
-        emplazamientos.forEach((emp, index) => {
+        emplazamientosFiltrados.forEach((emp, index) => {
           if (!emp.coordenadas || !emp.coordenadas.lat || !emp.coordenadas.lng) {
             console.warn('[RobustMapView] Emplazamiento sin coordenadas:', emp._id, emp.nombre);
             return;
@@ -101,7 +171,7 @@ export const RobustMapView: React.FC<RobustMapViewProps> = ({
           const lat = emp.coordenadas.lat;
           const lng = emp.coordenadas.lng;
 
-          console.log(`[RobustMapView] Procesando marcador ${index + 1}/${emplazamientos.length}:`, {
+          console.log(`[RobustMapView] Procesando marcador ${index + 1}/${emplazamientosFiltrados.length}:`, {
             nombre: emp.nombre,
             lat,
             lng,
@@ -226,7 +296,7 @@ export const RobustMapView: React.FC<RobustMapViewProps> = ({
         mapInstanceRef.current = null;
       }
     };
-  }, [leafletLoaded, emplazamientos]);
+  }, [leafletLoaded, emplazamientosFiltrados, emplazamientos, searchTerm, filterEstado, filterCliente, filterSubcliente, filterValorMin, filterValorMax, filterDepositosMin, filterDepositosMax, filterDiasMin]);
 
   // Estados de carga y error
   if (loading || mapLoading) {
@@ -285,7 +355,7 @@ export const RobustMapView: React.FC<RobustMapViewProps> = ({
         <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div>
             <h5 className="mb-0">Mapa de Emplazamientos</h5>
-            <small className="text-muted">{emplazamientos.length} emplazamientos activos</small>
+            <small className="text-muted">{emplazamientosFiltrados.length} emplazamientos mostrados de {emplazamientos.length} total</small>
           </div>
           <div className="d-flex gap-3 align-items-center">
             <small className="text-muted fw-bold">Leyenda:</small>
@@ -325,6 +395,122 @@ export const RobustMapView: React.FC<RobustMapViewProps> = ({
           </div>
         </div>
       </Card.Header>
+
+      {/* Filtros */}
+      <div className="p-3 bg-light border-bottom">
+        {/* Filtros Row 1 */}
+        <Row className="mb-2">
+          <Col md={4}>
+            <InputGroup size="sm">
+              <InputGroup.Text><i className="bi bi-search"></i></InputGroup.Text>
+              <Form.Control
+                placeholder="Buscar por nombre o ciudad..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </InputGroup>
+          </Col>
+          <Col md={2}>
+            <Form.Select size="sm" value={filterCliente} onChange={(e) => setFilterCliente(e.target.value)}>
+              <option value="all">Todos los clientes</option>
+              {clientes.filter(c => !c.esSubcliente).map(cliente => (
+                <option key={cliente._id} value={cliente._id}>{cliente.nombre}</option>
+              ))}
+            </Form.Select>
+          </Col>
+          <Col md={2}>
+            <Form.Select size="sm" value={filterSubcliente} onChange={(e) => setFilterSubcliente(e.target.value)}>
+              <option value="all">Todos los subclientes</option>
+              {subclientes.map(subcliente => (
+                <option key={subcliente._id} value={subcliente._id}>{subcliente.nombre}</option>
+              ))}
+            </Form.Select>
+          </Col>
+          <Col md={2}>
+            <Form.Select size="sm" value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)}>
+              <option value="all">Todos los estados</option>
+              <option value="activo">Normal</option>
+              <option value="inactivo">Advertencia/Crítico</option>
+            </Form.Select>
+          </Col>
+          <Col md={2}>
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              className="w-100"
+              onClick={() => {
+                setSearchTerm('');
+                setFilterEstado('all');
+                setFilterCliente('all');
+                setFilterSubcliente('all');
+                setFilterValorMin('');
+                setFilterValorMax('');
+                setFilterDepositosMin('');
+                setFilterDepositosMax('');
+                setFilterDiasMin('');
+              }}
+            >
+              <i className="bi bi-x-circle me-1"></i>
+              Limpiar filtros
+            </Button>
+          </Col>
+        </Row>
+
+        {/* Filtros Row 2 - Rangos numéricos */}
+        <Row>
+          <Col md={2}>
+            <Form.Control
+              type="number"
+              size="sm"
+              placeholder="Valor mín €"
+              value={filterValorMin}
+              onChange={(e) => setFilterValorMin(e.target.value)}
+            />
+          </Col>
+          <Col md={2}>
+            <Form.Control
+              type="number"
+              size="sm"
+              placeholder="Valor máx €"
+              value={filterValorMax}
+              onChange={(e) => setFilterValorMax(e.target.value)}
+            />
+          </Col>
+          <Col md={2}>
+            <Form.Control
+              type="number"
+              size="sm"
+              placeholder="Depósitos mín"
+              value={filterDepositosMin}
+              onChange={(e) => setFilterDepositosMin(e.target.value)}
+            />
+          </Col>
+          <Col md={2}>
+            <Form.Control
+              type="number"
+              size="sm"
+              placeholder="Depósitos máx"
+              value={filterDepositosMax}
+              onChange={(e) => setFilterDepositosMax(e.target.value)}
+            />
+          </Col>
+          <Col md={2}>
+            <Form.Control
+              type="number"
+              size="sm"
+              placeholder="Días mín venc."
+              value={filterDiasMin}
+              onChange={(e) => setFilterDiasMin(e.target.value)}
+            />
+          </Col>
+          <Col md={2}>
+            <div className="small text-muted text-center pt-1">
+              <strong>{emplazamientosFiltrados.length}</strong> resultados
+            </div>
+          </Col>
+        </Row>
+      </div>
+
       <Card.Body className="p-0" style={{ height: '600px' }}>
         <div
           ref={mapContainerRef}
