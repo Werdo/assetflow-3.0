@@ -154,18 +154,9 @@ exports.getEmplazamiento = asyncHandler(async (req, res) => {
  * @access  Private (Admin/Manager)
  */
 exports.createEmplazamiento = asyncHandler(async (req, res) => {
-  const { cliente, subcliente, nombre, direccion, coordenadas, contacto, observaciones } = req.body;
+  let { cliente, subcliente, nombre, direccion, coordenadas, contacto, observaciones } = req.body;
 
-  // Verificar que el cliente existe y está activo
-  const clienteDoc = await Cliente.findById(cliente);
-  if (!clienteDoc) {
-    throw new ValidationError('Cliente no encontrado');
-  }
-  if (!clienteDoc.activo) {
-    throw new ValidationError('El cliente está inactivo');
-  }
-
-  // Si se especifica subcliente, verificar que existe y pertenece al cliente
+  // Si se especifica subcliente, obtener su cliente principal automáticamente
   let subclienteDoc = null;
   if (subcliente) {
     subclienteDoc = await Cliente.findById(subcliente);
@@ -175,12 +166,24 @@ exports.createEmplazamiento = asyncHandler(async (req, res) => {
     if (!subclienteDoc.esSubcliente) {
       throw new ValidationError('El ID especificado no corresponde a un subcliente');
     }
-    if (!subclienteDoc.clientePrincipal || subclienteDoc.clientePrincipal.toString() !== cliente) {
-      throw new ValidationError('El subcliente no pertenece al cliente especificado');
-    }
     if (!subclienteDoc.activo) {
       throw new ValidationError('El subcliente está inactivo');
     }
+
+    // Auto-asignar el cliente principal del subcliente
+    cliente = subclienteDoc.clientePrincipal.toString();
+  }
+
+  // Verificar que el cliente existe y está activo
+  const clienteDoc = await Cliente.findById(cliente);
+  if (!clienteDoc) {
+    throw new ValidationError('Cliente no encontrado');
+  }
+  if (!clienteDoc.activo) {
+    throw new ValidationError('El cliente está inactivo');
+  }
+  if (clienteDoc.esSubcliente) {
+    throw new ValidationError('El cliente debe ser un cliente principal, no un subcliente');
   }
 
   // Validar coordenadas
@@ -243,12 +246,37 @@ exports.updateEmplazamiento = asyncHandler(async (req, res) => {
     throw new NotFoundError('Emplazamiento');
   }
 
-  const { cliente, subcliente, nombre, direccion, coordenadas, contacto, observaciones, activo, estado } = req.body;
+  let { cliente, subcliente, nombre, direccion, coordenadas, contacto, observaciones, activo, estado } = req.body;
 
   // Si se envía estado en lugar de activo, convertirlo
   let activoValue = activo;
   if (estado !== undefined) {
     activoValue = estado === 'activo';
+  }
+
+  // Si cambia el subcliente, verificar y auto-asignar cliente principal
+  if (subcliente !== undefined) {
+    if (subcliente === null || subcliente === '') {
+      // Se está eliminando el subcliente
+      emplazamiento.subcliente = null;
+      // El cliente se mantiene como está
+    } else {
+      // Se está asignando un subcliente
+      const subclienteDoc = await Cliente.findById(subcliente);
+      if (!subclienteDoc) {
+        throw new ValidationError('Subcliente no encontrado');
+      }
+      if (!subclienteDoc.esSubcliente) {
+        throw new ValidationError('El ID especificado no corresponde a un subcliente');
+      }
+      if (!subclienteDoc.activo) {
+        throw new ValidationError('El subcliente está inactivo');
+      }
+
+      // Auto-asignar el cliente principal del subcliente
+      cliente = subclienteDoc.clientePrincipal.toString();
+      emplazamiento.subcliente = subcliente;
+    }
   }
 
   // Si cambia el cliente, verificar que existe y está activo
@@ -260,35 +288,10 @@ exports.updateEmplazamiento = asyncHandler(async (req, res) => {
     if (!clienteDoc.activo) {
       throw new ValidationError('El cliente está inactivo');
     }
-    emplazamiento.cliente = cliente;
-  }
-
-  // Si cambia el subcliente, verificar
-  if (subcliente !== undefined) {
-    if (subcliente === null || subcliente === '') {
-      // Se está eliminando el subcliente
-      emplazamiento.subcliente = null;
-    } else {
-      // Se está asignando un subcliente
-      const subclienteDoc = await Cliente.findById(subcliente);
-      if (!subclienteDoc) {
-        throw new ValidationError('Subcliente no encontrado');
-      }
-      if (!subclienteDoc.esSubcliente) {
-        throw new ValidationError('El ID especificado no corresponde a un subcliente');
-      }
-
-      // Verificar que pertenece al cliente actual
-      const clienteActual = emplazamiento.cliente.toString();
-      if (!subclienteDoc.clientePrincipal || subclienteDoc.clientePrincipal.toString() !== clienteActual) {
-        throw new ValidationError('El subcliente no pertenece al cliente del emplazamiento');
-      }
-      if (!subclienteDoc.activo) {
-        throw new ValidationError('El subcliente está inactivo');
-      }
-
-      emplazamiento.subcliente = subcliente;
+    if (clienteDoc.esSubcliente) {
+      throw new ValidationError('El cliente debe ser un cliente principal, no un subcliente');
     }
+    emplazamiento.cliente = cliente;
   }
 
   if (nombre) emplazamiento.nombre = nombre;
