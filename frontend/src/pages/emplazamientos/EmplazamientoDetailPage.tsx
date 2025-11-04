@@ -47,14 +47,14 @@ export const EmplazamientoDetailPage = () => {
       setError(null);
 
       // Cargar datos en paralelo
-      const [emplazamientoData, estadisticasData, depositosData] = await Promise.all([
-        emplazamientoService.getById(id!),
-        emplazamientoService.getEstadisticas(id!),
+      // getWithStats() devuelve emplazamiento y estadísticas en una sola llamada
+      const [empData, depositosData] = await Promise.all([
+        emplazamientoService.getWithStats(id!),
         depositoService.getByEmplazamiento(id!)
       ]);
 
-      setEmplazamiento(emplazamientoData);
-      setEstadisticas(estadisticasData);
+      setEmplazamiento(empData.emplazamiento);
+      setEstadisticas(empData.estadisticas);
       setDepositos(depositosData);
     } catch (error: any) {
       console.error('Error al cargar datos del emplazamiento:', error);

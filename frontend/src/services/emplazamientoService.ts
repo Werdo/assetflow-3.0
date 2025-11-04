@@ -144,12 +144,28 @@ export const emplazamientoService = {
   },
 
   /**
+   * Obtiene un emplazamiento por ID con estadísticas incluidas
+   * El endpoint /emplazamientos/:id ya devuelve estadísticas
+   */
+  async getWithStats(id: string): Promise<{ emplazamiento: Emplazamiento; estadisticas: EmplazamientoEstadisticas }> {
+    try {
+      const data = await apiClient.get<{ emplazamiento: Emplazamiento; estadisticas: EmplazamientoEstadisticas }>(`/emplazamientos/${id}`);
+      return data;
+    } catch (error: any) {
+      console.error('Error al obtener emplazamiento con estadísticas:', error);
+      throw new Error(error.response?.data?.message || 'Error al cargar emplazamiento');
+    }
+  },
+
+  /**
    * Obtiene estadísticas de un emplazamiento
+   * @deprecated Use getWithStats() en su lugar, ya que el endpoint /:id incluye estadísticas
    */
   async getEstadisticas(id: string): Promise<EmplazamientoEstadisticas> {
     try {
-      const data = await apiClient.get<EmplazamientoEstadisticas>(`/emplazamientos/${id}/estadisticas`);
-      return data;
+      // Usar el mismo endpoint que getWithStats y extraer solo estadísticas
+      const data = await this.getWithStats(id);
+      return data.estadisticas;
     } catch (error: any) {
       console.error('Error al obtener estadísticas de emplazamiento:', error);
       throw new Error(error.response?.data?.message || 'Error al cargar estadísticas');
