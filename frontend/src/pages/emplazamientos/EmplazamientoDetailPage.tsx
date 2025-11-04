@@ -178,22 +178,22 @@ export const EmplazamientoDetailPage = () => {
                   )}
                   <tr>
                     <td className="text-muted"><strong>Dirección:</strong></td>
-                    <td>{emplazamiento.direccion}</td>
+                    <td>{typeof emplazamiento.direccion === 'string' ? emplazamiento.direccion : (emplazamiento.direccion as any)?.calle || 'N/A'}</td>
                   </tr>
                   <tr>
                     <td className="text-muted"><strong>Ciudad:</strong></td>
-                    <td>{emplazamiento.ciudad}</td>
+                    <td>{(emplazamiento as any).ciudad || (typeof emplazamiento.direccion === 'object' ? (emplazamiento.direccion as any)?.ciudad : 'N/A')}</td>
                   </tr>
-                  {emplazamiento.provincia && (
+                  {((emplazamiento as any).provincia || (typeof emplazamiento.direccion === 'object' && (emplazamiento.direccion as any)?.provincia)) && (
                     <tr>
                       <td className="text-muted"><strong>Provincia:</strong></td>
-                      <td>{emplazamiento.provincia}</td>
+                      <td>{(emplazamiento as any).provincia || (emplazamiento.direccion as any)?.provincia}</td>
                     </tr>
                   )}
-                  {emplazamiento.codigoPostal && (
+                  {((emplazamiento as any).codigoPostal || (typeof emplazamiento.direccion === 'object' && (emplazamiento.direccion as any)?.codigoPostal)) && (
                     <tr>
                       <td className="text-muted"><strong>C.P.:</strong></td>
-                      <td>{emplazamiento.codigoPostal}</td>
+                      <td>{(emplazamiento as any).codigoPostal || (emplazamiento.direccion as any)?.codigoPostal}</td>
                     </tr>
                   )}
                   {emplazamiento.tipoAlmacen && (
