@@ -308,8 +308,9 @@ exports.getMapaEmplazamientos = asyncHandler(async (req, res) => {
       const totales = depositos.reduce((acc, dep) => {
         acc.totalDepositos++;
         acc.valorTotal += dep.valorTotal;
+        acc.totalUnidades += dep.cantidad || 0;
         return acc;
-      }, { totalDepositos: 0, valorTotal: 0 });
+      }, { totalDepositos: 0, valorTotal: 0, totalUnidades: 0 });
 
       // Obtener alertas del emplazamiento
       const depositosIds = depositos.map(d => d._id);
@@ -360,6 +361,7 @@ exports.getMapaEmplazamientos = asyncHandler(async (req, res) => {
         provincia: emp.direccion?.provincia,
         depositosActivos: totales.totalDepositos,
         valorTotal: totales.valorTotal,
+        totalUnidades: totales.totalUnidades,
         diasMinimosRestantes,
         estado,
         depositos: depositos.map(d => ({

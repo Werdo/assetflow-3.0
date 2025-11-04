@@ -29,6 +29,11 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Columnas visibles
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([
+    'nombre', 'cliente', 'ciudad', 'valorTotal', 'depositos', 'unidades', 'diasMin', 'estado'
+  ]);
+
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState<string>('all');
@@ -70,6 +75,15 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
       setSortOrder('asc');
     }
     setCurrentPage(1);
+  };
+
+  // Toggle column visibility
+  const toggleColumn = (column: string) => {
+    if (visibleColumns.includes(column)) {
+      setVisibleColumns(visibleColumns.filter(col => col !== column));
+    } else {
+      setVisibleColumns([...visibleColumns, column]);
+    }
   };
 
   // Obtener subclientes disponibles
@@ -183,6 +197,10 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
         aVal = a.depositosActivos || 0;
         bVal = b.depositosActivos || 0;
         break;
+      case 'unidades':
+        aVal = (a as any).totalUnidades || 0;
+        bVal = (b as any).totalUnidades || 0;
+        break;
       case 'diasMinimo':
         aVal = (a as any).diasMinimosRestantes === null || (a as any).diasMinimosRestantes === undefined ? Infinity : (a as any).diasMinimosRestantes;
         bVal = (b as any).diasMinimosRestantes === null || (b as any).diasMinimosRestantes === undefined ? Infinity : (b as any).diasMinimosRestantes;
@@ -244,6 +262,87 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
             <h5 className="mb-0">Vista de Emplazamientos</h5>
             <small className="text-muted">{emplazamientos.length} emplazamientos totales</small>
           </div>
+          <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" size="sm" id="dropdown-columns">
+              <i className="bi bi-layout-three-columns me-2"></i>
+              Columnas
+            </Dropdown.Toggle>
+            <Dropdown.Menu>
+              <Dropdown.Header>Seleccionar columnas visibles</Dropdown.Header>
+              <Dropdown.Item onClick={() => toggleColumn('nombre')}>
+                <Form.Check
+                  type="checkbox"
+                  label="Nombre"
+                  checked={visibleColumns.includes('nombre')}
+                  onChange={() => {}}
+                  className="d-inline-block"
+                />
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => toggleColumn('cliente')}>
+                <Form.Check
+                  type="checkbox"
+                  label="Cliente"
+                  checked={visibleColumns.includes('cliente')}
+                  onChange={() => {}}
+                  className="d-inline-block"
+                />
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => toggleColumn('ciudad')}>
+                <Form.Check
+                  type="checkbox"
+                  label="Ciudad"
+                  checked={visibleColumns.includes('ciudad')}
+                  onChange={() => {}}
+                  className="d-inline-block"
+                />
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => toggleColumn('valorTotal')}>
+                <Form.Check
+                  type="checkbox"
+                  label="Valor Total"
+                  checked={visibleColumns.includes('valorTotal')}
+                  onChange={() => {}}
+                  className="d-inline-block"
+                />
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => toggleColumn('depositos')}>
+                <Form.Check
+                  type="checkbox"
+                  label="Depósitos"
+                  checked={visibleColumns.includes('depositos')}
+                  onChange={() => {}}
+                  className="d-inline-block"
+                />
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => toggleColumn('unidades')}>
+                <Form.Check
+                  type="checkbox"
+                  label="Unidades"
+                  checked={visibleColumns.includes('unidades')}
+                  onChange={() => {}}
+                  className="d-inline-block"
+                />
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => toggleColumn('diasMin')}>
+                <Form.Check
+                  type="checkbox"
+                  label="Días Mín"
+                  checked={visibleColumns.includes('diasMin')}
+                  onChange={() => {}}
+                  className="d-inline-block"
+                />
+              </Dropdown.Item>
+              <Dropdown.Item onClick={() => toggleColumn('estado')}>
+                <Form.Check
+                  type="checkbox"
+                  label="Estado"
+                  checked={visibleColumns.includes('estado')}
+                  onChange={() => {}}
+                  className="d-inline-block"
+                />
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
         </div>
       </Card.Header>
       <Card.Body className="p-3">
@@ -355,23 +454,42 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
             <Table hover className="mb-0" size="sm">
               <thead className="table-light">
                 <tr>
-                  <th onClick={() => handleSort('nombre')} style={{ cursor: 'pointer' }}>
-                    Nombre {sortBy === 'nombre' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th>Cliente / Subcliente</th>
-                  <th onClick={() => handleSort('ciudad')} style={{ cursor: 'pointer' }}>
-                    Ciudad {sortBy === 'ciudad' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th onClick={() => handleSort('valorTotal')} style={{ cursor: 'pointer' }} className="text-end">
-                    Valor Total {sortBy === 'valorTotal' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th onClick={() => handleSort('depositosActivos')} style={{ cursor: 'pointer' }} className="text-center">
-                    Depósitos {sortBy === 'depositosActivos' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th onClick={() => handleSort('diasMinimo')} style={{ cursor: 'pointer' }} className="text-center">
-                    Días Mín {sortBy === 'diasMinimo' && (sortOrder === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="text-center">Estado</th>
+                  {visibleColumns.includes('nombre') && (
+                    <th onClick={() => handleSort('nombre')} style={{ cursor: 'pointer' }}>
+                      Nombre {sortBy === 'nombre' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                  )}
+                  {visibleColumns.includes('cliente') && (
+                    <th>Cliente / Subcliente</th>
+                  )}
+                  {visibleColumns.includes('ciudad') && (
+                    <th onClick={() => handleSort('ciudad')} style={{ cursor: 'pointer' }}>
+                      Ciudad {sortBy === 'ciudad' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                  )}
+                  {visibleColumns.includes('valorTotal') && (
+                    <th onClick={() => handleSort('valorTotal')} style={{ cursor: 'pointer' }} className="text-end">
+                      Valor Total {sortBy === 'valorTotal' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                  )}
+                  {visibleColumns.includes('depositos') && (
+                    <th onClick={() => handleSort('depositosActivos')} style={{ cursor: 'pointer' }} className="text-center">
+                      Depósitos {sortBy === 'depositosActivos' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                  )}
+                  {visibleColumns.includes('unidades') && (
+                    <th onClick={() => handleSort('unidades')} style={{ cursor: 'pointer' }} className="text-center">
+                      Unidades {sortBy === 'unidades' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                  )}
+                  {visibleColumns.includes('diasMin') && (
+                    <th onClick={() => handleSort('diasMinimo')} style={{ cursor: 'pointer' }} className="text-center">
+                      Días Mín {sortBy === 'diasMinimo' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                  )}
+                  {visibleColumns.includes('estado') && (
+                    <th className="text-center">Estado</th>
+                  )}
                   <th className="text-center">Acciones</th>
                 </tr>
               </thead>
@@ -382,50 +500,69 @@ export const SimplifiedMapView: React.FC<SimplifiedMapViewProps> = ({
 
                   return (
                     <tr key={emp._id}>
-                      <td><strong>{emp.nombre}</strong></td>
-                      <td>
-                        {(emp as any).subcliente ? (
-                          <div>
-                            <div><strong className="small">{(emp as any).subcliente.clientePrincipal?.nombre || emp.cliente?.nombre}</strong></div>
-                            <small className="text-muted">└ {(emp as any).subcliente.nombre}</small>
-                          </div>
-                        ) : (
-                          <span className="small">{emp.cliente?.nombre || 'N/A'}</span>
-                        )}
-                      </td>
-                      <td className="small">{emp.ciudad || '-'}{emp.provincia ? `, ${emp.provincia}` : ''}</td>
-                      <td className="text-end">
-                        <strong className="text-success">
-                          €{(emp.valorTotal || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-                        </strong>
-                      </td>
-                      <td className="text-center">
-                        <Badge bg="info">{emp.depositosActivos || 0}</Badge>
-                      </td>
-                      <td className="text-center">
-                        {diasMin !== null && diasMin !== undefined ? (
+                      {visibleColumns.includes('nombre') && (
+                        <td><strong>{emp.nombre}</strong></td>
+                      )}
+                      {visibleColumns.includes('cliente') && (
+                        <td>
+                          {(emp as any).subcliente ? (
+                            <div>
+                              <div><strong className="small">{(emp as any).subcliente.clientePrincipal?.nombre || emp.cliente?.nombre}</strong></div>
+                              <small className="text-muted">└ {(emp as any).subcliente.nombre}</small>
+                            </div>
+                          ) : (
+                            <span className="small">{emp.cliente?.nombre || 'N/A'}</span>
+                          )}
+                        </td>
+                      )}
+                      {visibleColumns.includes('ciudad') && (
+                        <td className="small">{emp.ciudad || '-'}{emp.provincia ? `, ${emp.provincia}` : ''}</td>
+                      )}
+                      {visibleColumns.includes('valorTotal') && (
+                        <td className="text-end">
+                          <strong className="text-success">
+                            €{(emp.valorTotal || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                          </strong>
+                        </td>
+                      )}
+                      {visibleColumns.includes('depositos') && (
+                        <td className="text-center">
+                          <Badge bg="info">{emp.depositosActivos || 0}</Badge>
+                        </td>
+                      )}
+                      {visibleColumns.includes('unidades') && (
+                        <td className="text-center">
+                          <Badge bg="secondary">{(emp as any).totalUnidades || 0}</Badge>
+                        </td>
+                      )}
+                      {visibleColumns.includes('diasMin') && (
+                        <td className="text-center">
+                          {diasMin !== null && diasMin !== undefined ? (
+                            <Badge bg={
+                              diasMin < 7 ? 'danger' :
+                              diasMin < 30 ? 'warning' :
+                              'success'
+                            }>
+                              {diasMin} días
+                            </Badge>
+                          ) : (
+                            <span className="text-muted small">N/A</span>
+                          )}
+                        </td>
+                      )}
+                      {visibleColumns.includes('estado') && (
+                        <td className="text-center">
                           <Badge bg={
-                            diasMin < 7 ? 'danger' :
-                            diasMin < 30 ? 'warning' :
-                            'success'
-                          }>
-                            {diasMin} días
+                            estado === 'verde' || estado === 'normal' ? 'success' :
+                            estado === 'amarillo' || estado === 'warning' ? 'warning' :
+                            'danger'
+                          } className="small">
+                            {estado === 'verde' || estado === 'normal' ? 'Normal' :
+                             estado === 'amarillo' || estado === 'warning' ? 'Advertencia' :
+                             'Crítico'}
                           </Badge>
-                        ) : (
-                          <span className="text-muted small">N/A</span>
-                        )}
-                      </td>
-                      <td className="text-center">
-                        <Badge bg={
-                          estado === 'verde' || estado === 'normal' ? 'success' :
-                          estado === 'amarillo' || estado === 'warning' ? 'warning' :
-                          'danger'
-                        } className="small">
-                          {estado === 'verde' || estado === 'normal' ? 'Normal' :
-                           estado === 'amarillo' || estado === 'warning' ? 'Advertencia' :
-                           'Crítico'}
-                        </Badge>
-                      </td>
+                        </td>
+                      )}
                       <td className="text-center">
                         <Dropdown>
                           <Dropdown.Toggle

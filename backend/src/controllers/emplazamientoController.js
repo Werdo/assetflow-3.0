@@ -79,6 +79,7 @@ exports.getEmplazamientos = asyncHandler(async (req, res) => {
 
       const valorTotal = depositos.reduce((sum, dep) => sum + (dep.valorTotal || 0), 0);
       const depositosActivos = depositos.length;
+      const totalUnidades = depositos.reduce((sum, dep) => sum + (dep.cantidad || 0), 0);
 
       // Calculate días mínimo to expiration
       let diasMinimo = null;
@@ -96,6 +97,7 @@ exports.getEmplazamientos = asyncHandler(async (req, res) => {
         ...emp.toPublicJSON(),
         valorTotal,
         depositosActivos,
+        totalUnidades,
         diasMinimo
       };
     })

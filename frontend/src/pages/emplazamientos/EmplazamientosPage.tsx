@@ -33,6 +33,11 @@ export const EmplazamientosPage = () => {
   const [editingEmplazamiento, setEditingEmplazamiento] = useState<Emplazamiento | null>(null);
   const [geocoding, setGeocoding] = useState(false);
 
+  // Columnas visibles
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([
+    'codigo', 'nombre', 'cliente', 'ciudad', 'valorTotal', 'depositos', 'unidades', 'diasMin', 'estado'
+  ]);
+
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState<string>('all');
@@ -260,6 +265,15 @@ export const EmplazamientosPage = () => {
     setCurrentPage(1);
   };
 
+  // Toggle column visibility
+  const toggleColumn = (column: string) => {
+    if (visibleColumns.includes(column)) {
+      setVisibleColumns(visibleColumns.filter(col => col !== column));
+    } else {
+      setVisibleColumns([...visibleColumns, column]);
+    }
+  };
+
   // Obtener subclientes disponibles
   const subclientes = clientes.filter(c => c.esSubcliente);
 
@@ -340,6 +354,10 @@ export const EmplazamientosPage = () => {
         aVal = a.depositosActivos || 0;
         bVal = b.depositosActivos || 0;
         break;
+      case 'unidades':
+        aVal = (a as any).totalUnidades || 0;
+        bVal = (b as any).totalUnidades || 0;
+        break;
       case 'diasMinimo':
         aVal = a.diasMinimo === null || a.diasMinimo === undefined ? Infinity : a.diasMinimo;
         bVal = b.diasMinimo === null || b.diasMinimo === undefined ? Infinity : b.diasMinimo;
@@ -402,10 +420,102 @@ export const EmplazamientosPage = () => {
               <h2 className="fw-bold mb-1">Emplazamientos</h2>
               <p className="text-muted mb-0">Gestión de ubicaciones de depósito</p>
             </div>
-            <Button variant="primary" onClick={() => handleShowModal()}>
-              <i className="bi bi-plus-circle me-2"></i>
-              Nuevo Emplazamiento
-            </Button>
+            <div className="d-flex gap-2">
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" size="sm" id="dropdown-columns">
+                  <i className="bi bi-layout-three-columns me-2"></i>
+                  Columnas
+                </Dropdown.Toggle>
+                <Dropdown.Menu>
+                  <Dropdown.Header>Seleccionar columnas visibles</Dropdown.Header>
+                  <Dropdown.Item onClick={() => toggleColumn('codigo')}>
+                    <Form.Check
+                      type="checkbox"
+                      label="Código"
+                      checked={visibleColumns.includes('codigo')}
+                      onChange={() => {}}
+                      className="d-inline-block"
+                    />
+                  </Dropdown.Item>
+                  <Dropdown.Item onClick={() => toggleColumn('nombre')}>
+                    <Form.Check
+                      type="checkbox"
+                      label="Nombre"
+                      checked={visibleColumns.includes('nombre')}
+                      onChange={() => {}}
+                      className="d-inline-block"
+                    />
+                  </Dropdown.Item>
+                  <Dropdown.Item onClick={() => toggleColumn('cliente')}>
+                    <Form.Check
+                      type="checkbox"
+                      label="Cliente"
+                      checked={visibleColumns.includes('cliente')}
+                      onChange={() => {}}
+                      className="d-inline-block"
+                    />
+                  </Dropdown.Item>
+                  <Dropdown.Item onClick={() => toggleColumn('ciudad')}>
+                    <Form.Check
+                      type="checkbox"
+                      label="Ciudad"
+                      checked={visibleColumns.includes('ciudad')}
+                      onChange={() => {}}
+                      className="d-inline-block"
+                    />
+                  </Dropdown.Item>
+                  <Dropdown.Item onClick={() => toggleColumn('valorTotal')}>
+                    <Form.Check
+                      type="checkbox"
+                      label="Valor Total"
+                      checked={visibleColumns.includes('valorTotal')}
+                      onChange={() => {}}
+                      className="d-inline-block"
+                    />
+                  </Dropdown.Item>
+                  <Dropdown.Item onClick={() => toggleColumn('depositos')}>
+                    <Form.Check
+                      type="checkbox"
+                      label="Depósitos"
+                      checked={visibleColumns.includes('depositos')}
+                      onChange={() => {}}
+                      className="d-inline-block"
+                    />
+                  </Dropdown.Item>
+                  <Dropdown.Item onClick={() => toggleColumn('unidades')}>
+                    <Form.Check
+                      type="checkbox"
+                      label="Unidades"
+                      checked={visibleColumns.includes('unidades')}
+                      onChange={() => {}}
+                      className="d-inline-block"
+                    />
+                  </Dropdown.Item>
+                  <Dropdown.Item onClick={() => toggleColumn('diasMin')}>
+                    <Form.Check
+                      type="checkbox"
+                      label="Días Mín"
+                      checked={visibleColumns.includes('diasMin')}
+                      onChange={() => {}}
+                      className="d-inline-block"
+                    />
+                  </Dropdown.Item>
+                  <Dropdown.Item onClick={() => toggleColumn('estado')}>
+                    <Form.Check
+                      type="checkbox"
+                      label="Estado"
+                      checked={visibleColumns.includes('estado')}
+                      onChange={() => {}}
+                      className="d-inline-block"
+                    />
+                  </Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
+              <Button variant="primary" onClick={() => handleShowModal()}>
+                <i className="bi bi-plus-circle me-2"></i>
+                Nuevo Emplazamiento
+              </Button>
+            </div>
           </div>
         </Col>
       </Row>
@@ -528,26 +638,47 @@ export const EmplazamientosPage = () => {
                   <Table hover className="mb-0" size="sm">
                     <thead className="table-light">
                       <tr>
-                        <th onClick={() => handleSort('codigo')} style={{ cursor: 'pointer' }}>
-                          Código {sortBy === 'codigo' && (sortOrder === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th onClick={() => handleSort('nombre')} style={{ cursor: 'pointer' }}>
-                          Nombre {sortBy === 'nombre' && (sortOrder === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th>Cliente / Subcliente</th>
-                        <th onClick={() => handleSort('ciudad')} style={{ cursor: 'pointer' }}>
-                          Ciudad {sortBy === 'ciudad' && (sortOrder === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th onClick={() => handleSort('valorTotal')} style={{ cursor: 'pointer' }} className="text-end">
-                          Valor Total {sortBy === 'valorTotal' && (sortOrder === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th onClick={() => handleSort('depositosActivos')} style={{ cursor: 'pointer' }} className="text-center">
-                          Depósitos {sortBy === 'depositosActivos' && (sortOrder === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th onClick={() => handleSort('diasMinimo')} style={{ cursor: 'pointer' }} className="text-center">
-                          Días Mín {sortBy === 'diasMinimo' && (sortOrder === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th className="text-center">Estado</th>
+                        {visibleColumns.includes('codigo') && (
+                          <th onClick={() => handleSort('codigo')} style={{ cursor: 'pointer' }}>
+                            Código {sortBy === 'codigo' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </th>
+                        )}
+                        {visibleColumns.includes('nombre') && (
+                          <th onClick={() => handleSort('nombre')} style={{ cursor: 'pointer' }}>
+                            Nombre {sortBy === 'nombre' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </th>
+                        )}
+                        {visibleColumns.includes('cliente') && (
+                          <th>Cliente / Subcliente</th>
+                        )}
+                        {visibleColumns.includes('ciudad') && (
+                          <th onClick={() => handleSort('ciudad')} style={{ cursor: 'pointer' }}>
+                            Ciudad {sortBy === 'ciudad' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </th>
+                        )}
+                        {visibleColumns.includes('valorTotal') && (
+                          <th onClick={() => handleSort('valorTotal')} style={{ cursor: 'pointer' }} className="text-end">
+                            Valor Total {sortBy === 'valorTotal' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </th>
+                        )}
+                        {visibleColumns.includes('depositos') && (
+                          <th onClick={() => handleSort('depositosActivos')} style={{ cursor: 'pointer' }} className="text-center">
+                            Depósitos {sortBy === 'depositosActivos' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </th>
+                        )}
+                        {visibleColumns.includes('unidades') && (
+                          <th onClick={() => handleSort('unidades')} style={{ cursor: 'pointer' }} className="text-center">
+                            Unidades {sortBy === 'unidades' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </th>
+                        )}
+                        {visibleColumns.includes('diasMin') && (
+                          <th onClick={() => handleSort('diasMinimo')} style={{ cursor: 'pointer' }} className="text-center">
+                            Días Mín {sortBy === 'diasMinimo' && (sortOrder === 'asc' ? '↑' : '↓')}
+                          </th>
+                        )}
+                        {visibleColumns.includes('estado') && (
+                          <th className="text-center">Estado</th>
+                        )}
                         <th className="text-center">Acciones</th>
                       </tr>
                     </thead>
@@ -558,45 +689,66 @@ export const EmplazamientosPage = () => {
 
                         return (
                           <tr key={emplazamiento._id}>
-                            <td><code className="small">{emplazamiento.codigo}</code></td>
-                            <td><strong>{emplazamiento.nombre}</strong></td>
-                            <td>
-                              {clientePrincipal && subclienteNombre ? (
-                                <div>
-                                  <div><strong className="small">{clientePrincipal}</strong></div>
-                                  <small className="text-muted">└ {subclienteNombre}</small>
-                                </div>
-                              ) : (
-                                <span className="small">{getClienteNombre(emplazamiento.cliente)}</span>
-                              )}
-                            </td>
-                            <td className="small">{emplazamiento.ciudad}</td>
-                            <td className="text-end">
-                              <strong className="text-success">
-                                €{(emplazamiento.valorTotal || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-                              </strong>
-                            </td>
-                            <td className="text-center">
-                              <Badge bg="info">{emplazamiento.depositosActivos || 0}</Badge>
-                            </td>
-                            <td className="text-center">
-                              {emplazamiento.diasMinimo !== null && emplazamiento.diasMinimo !== undefined ? (
-                                <Badge bg={
-                                  emplazamiento.diasMinimo < 7 ? 'danger' :
-                                  emplazamiento.diasMinimo < 30 ? 'warning' :
-                                  'success'
-                                }>
-                                  {emplazamiento.diasMinimo} días
+                            {visibleColumns.includes('codigo') && (
+                              <td><code className="small">{emplazamiento.codigo}</code></td>
+                            )}
+                            {visibleColumns.includes('nombre') && (
+                              <td><strong>{emplazamiento.nombre}</strong></td>
+                            )}
+                            {visibleColumns.includes('cliente') && (
+                              <td>
+                                {clientePrincipal && subclienteNombre ? (
+                                  <div>
+                                    <div><strong className="small">{clientePrincipal}</strong></div>
+                                    <small className="text-muted">└ {subclienteNombre}</small>
+                                  </div>
+                                ) : (
+                                  <span className="small">{getClienteNombre(emplazamiento.cliente)}</span>
+                                )}
+                              </td>
+                            )}
+                            {visibleColumns.includes('ciudad') && (
+                              <td className="small">{emplazamiento.ciudad}</td>
+                            )}
+                            {visibleColumns.includes('valorTotal') && (
+                              <td className="text-end">
+                                <strong className="text-success">
+                                  €{(emplazamiento.valorTotal || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                                </strong>
+                              </td>
+                            )}
+                            {visibleColumns.includes('depositos') && (
+                              <td className="text-center">
+                                <Badge bg="info">{emplazamiento.depositosActivos || 0}</Badge>
+                              </td>
+                            )}
+                            {visibleColumns.includes('unidades') && (
+                              <td className="text-center">
+                                <Badge bg="secondary">{(emplazamiento as any).totalUnidades || 0}</Badge>
+                              </td>
+                            )}
+                            {visibleColumns.includes('diasMin') && (
+                              <td className="text-center">
+                                {emplazamiento.diasMinimo !== null && emplazamiento.diasMinimo !== undefined ? (
+                                  <Badge bg={
+                                    emplazamiento.diasMinimo < 7 ? 'danger' :
+                                    emplazamiento.diasMinimo < 30 ? 'warning' :
+                                    'success'
+                                  }>
+                                    {emplazamiento.diasMinimo} días
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted small">N/A</span>
+                                )}
+                              </td>
+                            )}
+                            {visibleColumns.includes('estado') && (
+                              <td className="text-center">
+                                <Badge bg={emplazamiento.estado === 'activo' ? 'success' : 'secondary'} className="small">
+                                  {emplazamiento.estado === 'activo' ? 'Activo' : 'Inactivo'}
                                 </Badge>
-                              ) : (
-                                <span className="text-muted small">N/A</span>
-                              )}
-                            </td>
-                            <td className="text-center">
-                              <Badge bg={emplazamiento.estado === 'activo' ? 'success' : 'secondary'} className="small">
-                                {emplazamiento.estado === 'activo' ? 'Activo' : 'Inactivo'}
-                              </Badge>
-                            </td>
+                              </td>
+                            )}
                             <td className="text-center">
                               <div className="d-flex gap-1 justify-content-center">
                                 <Button
