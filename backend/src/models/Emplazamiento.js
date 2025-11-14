@@ -67,6 +67,12 @@ const emplazamientoSchema = new mongoose.Schema({
   observaciones: {
     type: String,
     trim: true
+  },
+  tipoIcono: {
+    type: String,
+    enum: ['circle', 'square'],
+    default: 'circle',
+    trim: true
   }
 }, {
   timestamps: true
@@ -189,6 +195,7 @@ emplazamientoSchema.methods.toPublicJSON = function() {
     activo: this.activo,
     estado: this.activo ? 'activo' : 'inactivo',
     observaciones: this.observaciones,
+    tipoIcono: this.tipoIcono || 'circle',
     createdAt: this.createdAt,
     updatedAt: this.updatedAt
   };
