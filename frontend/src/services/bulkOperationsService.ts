@@ -60,7 +60,8 @@ class BulkOperationsService {
     if (filters?.productoId) params.append('productoId', filters.productoId);
     if (filters?.estado) params.append('estado', filters.estado);
 
-    const response = await apiClient.get(`/bulk/depositos/export/csv?${params.toString()}`, {
+    // Usar la instancia de axios directamente para respuestas blob
+    const response = await apiClient.getAxiosInstance().get(`/bulk/depositos/export/csv?${params.toString()}`, {
       responseType: 'blob'
     });
     return response.data;
@@ -77,7 +78,8 @@ class BulkOperationsService {
     if (filters?.productoId) params.append('productoId', filters.productoId);
     if (filters?.estado) params.append('estado', filters.estado);
 
-    const response = await apiClient.get(`/bulk/depositos/export/excel?${params.toString()}`, {
+    // Usar la instancia de axios directamente para respuestas blob
+    const response = await apiClient.getAxiosInstance().get(`/bulk/depositos/export/excel?${params.toString()}`, {
       responseType: 'blob'
     });
     return response.data;
@@ -93,7 +95,8 @@ class BulkOperationsService {
     if (filters?.activo !== undefined) params.append('activo', String(filters.activo));
     if (filters?.tipoIcono) params.append('tipoIcono', filters.tipoIcono);
 
-    const response = await apiClient.get(`/bulk/emplazamientos/export/csv?${params.toString()}`, {
+    // Usar la instancia de axios directamente para respuestas blob
+    const response = await apiClient.getAxiosInstance().get(`/bulk/emplazamientos/export/csv?${params.toString()}`, {
       responseType: 'blob'
     });
     return response.data;
@@ -109,7 +112,8 @@ class BulkOperationsService {
     if (filters?.activo !== undefined) params.append('activo', String(filters.activo));
     if (filters?.tipoIcono) params.append('tipoIcono', filters.tipoIcono);
 
-    const response = await apiClient.get(`/bulk/emplazamientos/export/excel?${params.toString()}`, {
+    // Usar la instancia de axios directamente para respuestas blob
+    const response = await apiClient.getAxiosInstance().get(`/bulk/emplazamientos/export/excel?${params.toString()}`, {
       responseType: 'blob'
     });
     return response.data;

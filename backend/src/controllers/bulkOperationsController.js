@@ -30,6 +30,9 @@ exports.exportDepositosCSV = async (req, res) => {
       .sort({ numeroDeposito: 1 })
       .lean();
 
+    // Log para debugging
+    console.log(`Exportando ${depositos.length} depósitos a CSV`);
+
     // Convertir a formato plano para CSV
     const data = depositos.map(dep => ({
       numeroDeposito: dep.numeroDeposito || '',
