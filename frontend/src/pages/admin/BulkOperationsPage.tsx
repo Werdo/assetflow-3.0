@@ -120,7 +120,7 @@ export const BulkOperationsPage: React.FC = () => {
       if (result.errors.length === 0) {
         toast.success(`Importación completada: ${result.created} creados, ${result.updated} actualizados`);
       } else {
-        toast.warning(`Importación completada con ${result.errors.length} errores`);
+        toast(`Importación completada con ${result.errors.length} errores`, { icon: '⚠️' });
       }
     } catch (error: any) {
       console.error('Error importing depositos:', error);
@@ -147,7 +147,7 @@ export const BulkOperationsPage: React.FC = () => {
       if (result.errors.length === 0) {
         toast.success(`Importación completada: ${result.created} creados, ${result.updated} actualizados`);
       } else {
-        toast.warning(`Importación completada con ${result.errors.length} errores`);
+        toast(`Importación completada con ${result.errors.length} errores`, { icon: '⚠️' });
       }
     } catch (error: any) {
       console.error('Error importing emplazamientos:', error);
@@ -248,9 +248,9 @@ export const BulkOperationsPage: React.FC = () => {
                 <Table striped bordered hover size="sm">
                   <thead>
                     <tr>
-                      <th width="80">Fila</th>
+                      <th style={{ width: '80px' }}>Fila</th>
                       <th>Error</th>
-                      <th width="150">Código</th>
+                      <th style={{ width: '150px' }}>Código</th>
                     </tr>
                   </thead>
                   <tbody>
