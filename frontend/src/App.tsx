@@ -26,6 +26,7 @@ import SettingsPage from './pages/admin/SettingsPage';
 import TerminalPage from './pages/admin/TerminalPage';
 import BackupsPage from './pages/admin/BackupsPage';
 import SnapshotsPage from './pages/admin/SnapshotsPage';
+import BulkOperationsPage from './pages/admin/BulkOperationsPage';
 import { Toaster } from 'react-hot-toast';
 
 // Import Bootstrap CSS and Leaflet CSS
@@ -235,6 +236,16 @@ function App() {
               <ProtectedRoute requiredRole="admin">
                 <AdminLayout>
                   <SnapshotsPage />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/bulk-operations"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminLayout>
+                  <BulkOperationsPage />
                 </AdminLayout>
               </ProtectedRoute>
             }

@@ -23,6 +23,7 @@ const alertaRoutes = require('./routes/alertaRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const iaRoutes = require('./routes/iaRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const bulkOperationsRoutes = require('./routes/bulkOperationsRoutes');
 
 // Manejar excepciones no capturadas
 handleUncaughtException();
@@ -75,6 +76,7 @@ app.use('/api/alertas', alertaRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/ia', iaRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/bulk', bulkOperationsRoutes);
 
 // 404 handler
 app.use(notFoundMiddleware);

@@ -45,6 +45,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         { path: '/admin/terminal', icon: 'terminal-fill', label: 'Terminal' },
         { path: '/admin/backups', icon: 'database-fill-gear', label: 'Backups' },
         { path: '/admin/snapshots', icon: 'camera-fill', label: 'Snapshots' },
+        { path: '/admin/bulk-operations', icon: 'collection-fill', label: 'Operaciones Masivas' },
       ],
     },
     {
